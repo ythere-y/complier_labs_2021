@@ -33,7 +33,7 @@ int A::OpExp::MaxArgs(int cur) const {
 }
 
 int A::EseqExp::MaxArgs(int cur = 1) const {
-  // assert(stm != nullptr && exp != nullptr);
+  assert(stm != nullptr && exp != nullptr);
   int inner = stm->MaxArgs();
   if (inner >= cur)
     return inner;
@@ -41,7 +41,7 @@ int A::EseqExp::MaxArgs(int cur = 1) const {
     return cur;
 }
 int A::PairExpList::MaxArgs(int cur) const {
-  // assert(exp != nullptr && tail != nullptr);
+  assert(exp != nullptr && tail != nullptr);
   int front = exp->MaxArgs(cur);
   int back = tail->MaxArgs(cur + 1);
   if (front >= back)
@@ -50,7 +50,7 @@ int A::PairExpList::MaxArgs(int cur) const {
     return back;
 }
 int A::LastExpList::MaxArgs(int cur) const {
-  // assert(exp != nullptr);
+  assert(exp != nullptr);
   int get = exp->MaxArgs(cur);
   if (get >= cur)
     return get;
@@ -70,23 +70,20 @@ Table *A::AssignStm::Interp(Table *t) const {
   return mid->t;
 }
 Table *A::PrintStm::Interp(Table *t) const {
-  // assert(exps != nullptr && t != nullptr);
-  // printf("run into a print\n");
+  assert(exps != nullptr && t != nullptr);
   IntAndTable *mid = exps->Interp(t);
   return mid->t;
 }
 
 IntAndTable *A::OpExp::Interp(Table *t) const {
-  // assert(t != nullptr && left != nullptr && right != nullptr);
-  // printf("get into a opExp\n");
+  assert(left != nullptr && right != nullptr);
 
   IntAndTable *mid = left->Interp(t);
   int value_left = mid->i;
   int value_right = 0;
-  // Table *mid_t = mid->t;
   mid = right->Interp(mid->t);
-
   value_right = mid->i;
+
   switch (oper) {
   case PLUS:
     mid->i = value_left + value_right;
