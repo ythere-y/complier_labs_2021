@@ -6,62 +6,87 @@ namespace A {
 
 int A::CompoundStm::MaxArgs() const {
   // assert(stm1 != nullptr && stm2 != nullptr);
-  return stm1->MaxArgs() + stm2->MaxArgs();
+  int front = stm1->MaxArgs();
+  int back = stm2->MaxArgs();
+  if (front >= back)
+    return front;
+  else
+    return back;
 }
-Table *A::CompoundStm::Interp(Table *t) const {
-  return nullptr;
-  // assert(stm1 != nullptr && stm2 != nullptr && t != nullptr);
-  return stm2->Interp(stm1->Interp(t));
-}
-
 int A::AssignStm::MaxArgs() const {
-  // assert(exp != nullptr);
-  return 0;
-}
-Table *A::AssignStm::Interp(Table *t) const {
-  // assert(t != nullptr && exp != nullptr);
-  IntAndTable *mid = exp->Interp(t);
-  mid->t->Update(id, mid->i);
-  return mid->t;
-}
 
+  // assert(exp != nullptr);
+  return exp->MaxArgs(0);
+}
 int A::PrintStm::MaxArgs() const {
   // assert(exps != nullptr);
-  return exps->MaxArgs();
+  return exps->MaxArgs(1);
+}
+int A::IdExp::MaxArgs(int cur) const {
+  // assert(id != "");
+  return cur;
+}
+int A::NumExp::MaxArgs(int cur) const { return cur; }
+int A::OpExp::MaxArgs(int cur) const {
+  // assert(left != nullptr && right != nullptr);
+  return cur;
 }
 
+int A::EseqExp::MaxArgs(int cur = 1) const {
+  // assert(stm != nullptr && exp != nullptr);
+  int inner = stm->MaxArgs();
+  if (inner >= cur)
+    return inner;
+  else
+    return cur;
+}
+int A::PairExpList::MaxArgs(int cur) const {
+  // assert(exp != nullptr && tail != nullptr);
+  int front = exp->MaxArgs(cur);
+  int back = tail->MaxArgs(cur + 1);
+  if (front >= back)
+    return front;
+  else
+    return back;
+}
+int A::LastExpList::MaxArgs(int cur) const {
+  // assert(exp != nullptr);
+  int get = exp->MaxArgs(cur);
+  if (get >= cur)
+    return get;
+  else
+    return cur;
+}
+
+Table *A::CompoundStm::Interp(Table *t) const {
+  Table *front = stm1->Interp(t);
+
+  return stm2->Interp(front);
+}
+Table *A::AssignStm::Interp(Table *t) const {
+
+  IntAndTable *mid = exp->Interp(t);
+  mid->t = mid->t->Update(id, mid->i);
+  return mid->t;
+}
 Table *A::PrintStm::Interp(Table *t) const {
   // assert(exps != nullptr && t != nullptr);
+  // printf("run into a print\n");
   IntAndTable *mid = exps->Interp(t);
   return mid->t;
 }
 
-int A::IdExp::MaxArgs() const {
-  // assert(id != "");
-  return 1;
-}
-IntAndTable *A::IdExp::Interp(Table *t) const {
-  // assert(id != "" && t != nullptr);
-  IntAndTable *res = new IntAndTable(t->Lookup(id), t);
-  return res;
-}
-
-int A::NumExp::MaxArgs() const { return 1; }
-IntAndTable *A::NumExp::Interp(Table *t) const {
-  // assert(t != nullptr);
-  IntAndTable *res = new IntAndTable(num, t);
-  return res;
-}
-int A::OpExp::MaxArgs() const {
-  // assert(left != nullptr && right != nullptr);
-  return 1;
-}
 IntAndTable *A::OpExp::Interp(Table *t) const {
   // assert(t != nullptr && left != nullptr && right != nullptr);
+  // printf("get into a opExp\n");
+
   IntAndTable *mid = left->Interp(t);
   int value_left = mid->i;
+  int value_right = 0;
+  // Table *mid_t = mid->t;
   mid = right->Interp(mid->t);
-  int value_right = mid->i;
+
+  value_right = mid->i;
   switch (oper) {
   case PLUS:
     mid->i = value_left + value_right;
@@ -76,34 +101,37 @@ IntAndTable *A::OpExp::Interp(Table *t) const {
     mid->i = value_left / value_right;
     break;
   }
+
   return mid;
 }
-
-int A::EseqExp::MaxArgs() const {
-  // assert(stm != nullptr && exp != nullptr);
-  return stm->MaxArgs() + exp->MaxArgs();
+IntAndTable *A::IdExp::Interp(Table *t) const {
+  assert(id != "");
+  IntAndTable *res = new IntAndTable(t->Lookup(id), t);
+  return res;
+}
+IntAndTable *A::NumExp::Interp(Table *t) const {
+  IntAndTable *res = new IntAndTable(num, t);
+  return res;
 }
 IntAndTable *A::EseqExp::Interp(Table *t) const {
-  // assert(stm != nullptr && exp != nullptr && t != nullptr);
-  return exp->Interp(stm->Interp(t));
+  assert(stm != nullptr && exp != nullptr);
+
+  Table *front = stm->Interp(t);
+  IntAndTable *res = exp->Interp(front);
 }
 
-int A::PairExpList::MaxArgs() const {
-  // assert(exp != nullptr && tail != nullptr);
-  return exp->MaxArgs() + tail->MaxArgs();
-}
 IntAndTable *A::PairExpList::Interp(Table *t) const {
-  // assert(exp != nullptr && tail != nullptr && t != nullptr);
-  return tail->Interp(exp->Interp(t)->t);
+  assert(exp != nullptr && tail != nullptr);
+  IntAndTable *front = exp->Interp(t);
+  printf("%d ", front->i);
+  return tail->Interp(front->t);
 }
 
-int A::LastExpList::MaxArgs() const {
-  // assert(exp != nullptr);
-  return exp->MaxArgs();
-}
 IntAndTable *A::LastExpList::Interp(Table *t) const {
-  // assert(exp != nullptr && t != nullptr);
-  return exp->Interp(t);
+  assert(exp != nullptr);
+  IntAndTable *get = exp->Interp(t);
+  printf("%d\n", get->i);
+  return get;
 }
 
 int Table::Lookup(const std::string &key) const {
