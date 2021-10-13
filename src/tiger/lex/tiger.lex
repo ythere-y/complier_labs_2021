@@ -118,24 +118,24 @@
 
 
  /* handle comments */
-"/\*"  {adjustStr(); commentLevel_ = 1; begin(StartCondition__::COMMENT);}
+"/\*"  {adjustStr(); comment_level_ = 1; begin(StartCondition__::COMMENT);}
 <COMMENT> {
-  "\*/"  {adjustStr(); if(--commentLevel_ == 0) begin(StartCondition__::INITIAL); }
-  "/\*" {adjustStr(); commentLevel_++;}
+  "\*/"  {adjustStr(); if(--comment_level_ == 0) begin(StartCondition__::INITIAL); }
+  "/\*" {adjustStr(); comment_level_++;}
   \n    {adjustStr();}
   .     {adjustStr();}
 }
  /* handle strings */
-\"    {adjustStr(); stringBuf_.clear();  begin(StartCondition__::STRING);}
+\"    {adjustStr(); string_buf_.clear();  begin(StartCondition__::STRING);}
 <STRING> {
-  \"    {adjustStr(); errormsg.tokPos = charPos_ - (parsedStringLength_ + 1); setMatched(stringBuf_); begin(StartCondition__::INITIAL); return Parser::STRING; }
-  \\\"  {stringBuf_ += '"'; adjustStr();}
-  \\n   {stringBuf_ += '\n'; adjustStr();}
-  \\t   {stringBuf_ += '\t'; adjustStr();}
-  \\\\  {stringBuf_ += '\\'; adjustStr();}
+  \"    {adjustStr(); setMatched(string_buf_); begin(StartCondition__::INITIAL); return Parser::STRING; }
+  \\\"  {string_buf_ += '"'; adjustStr();}
+  \\n   {string_buf_ += '\n'; adjustStr();}
+  \\t   {string_buf_ += '\t'; adjustStr();}
+  \\\\  {string_buf_ += '\\'; adjustStr();}
   \\[[:blank:]\n\f]+\\  {adjustStr();}
-  \\[[:digit:]]{3}  {stringBuf_ += (char)atoi(matched().c_str() + 1); adjustStr();}
-  .           {stringBuf_ += matched(); adjustStr();}
+  \\[[:digit:]]{3}  {string_buf_ += (char)atoi(matched().c_str() + 1); adjustStr();}
+  .           {string_buf_ += matched(); adjustStr();}
 }
  /* illegal input */
 . {adjust(); errormsg_->Error(errormsg_->tok_pos_, "illegal token");}
