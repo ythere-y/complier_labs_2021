@@ -126,7 +126,7 @@
   .     {adjustStr();}
 }
  /* handle strings */
-\"    {adjustStr(); string_buf_.clear();  begin(StartCondition__::STRING);}
+\"    {adjust(); string_buf_.clear();  begin(StartCondition__::STRING);}
 <STRING> {
   \"    {adjustStr(); setMatched(string_buf_); begin(StartCondition__::INITIAL); return Parser::STRING; }
   \\\"  {string_buf_ += '"'; adjustStr();}
@@ -135,6 +135,7 @@
   \\\\  {string_buf_ += '\\'; adjustStr();}
   \\[[:blank:]\n\f]+\\  {adjustStr();}
   \\[[:digit:]]{3}  {string_buf_ += (char)atoi(matched().c_str() + 1); adjustStr();}
+  \\\^[A-Z] {adjustStr(); string_buf_ += matched()[2] - 'A' + 1;}
   .           {string_buf_ += matched(); adjustStr();}
 }
  /* illegal input */
