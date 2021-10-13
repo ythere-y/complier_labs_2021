@@ -7,7 +7,7 @@
  /* You can add lex definitions here. */
  /* TODO: Put your lab2 code here */
 
-%x COMMENT STR IGNORE
+%x COMMENT STRING IGNORE
 
 %%
 
