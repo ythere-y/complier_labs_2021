@@ -44,6 +44,7 @@
 
 %left OR
 %left AND
+%nonassoc EQ NEQ LT LE GT GE
 %left PLUS MINUS
 %left TIMES DIVIDE
 
@@ -68,15 +69,45 @@
 %%
 program:  exp  {absyn_tree_ = std::make_unique<absyn::AbsynTree>($1);};
 
-exp:  lvalue   {absyn_tree_ = std::make_unique<absyn::AbsynTree>($1);}
-  |   
+exp:  lvalue                  {$$ = $1;}
+  |   LPAREN expseq RPAREN    {$$ = $2;}
+  |   LPAREN exp  RPAREN      {$$ = $2;}
+  |   LPAREN RPAREN           {$$ = new absyn::VoidExp(scanner_.GetTokPos());}
+
+  |   INT                     {$$ = new absyn::IntExp(scanner_.GetTokPos(),$1);}
+  |   NIL                     {$$ = new absyn::NilExp(scanner_.GetTokPos());}
+  |   STRING                  {$$ = new absyn::StringExp(scanner_.GetTokPos(),$1);}
+
+  |   exp PLUS exp            {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::PLUS_OP,$1,$3);}
+  |   exp MINUS exp           {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::MINUS_OP,$1,$3);}
+  |   exp TIMES exp           {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::TIMES_OP,$1,$3);}
+  |   exp DIVIDE exp          {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::DIVIDE_OP,$1,$3);}
+  |   MINUS exp               {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::MINUS_OP,new absyn::IntExp(scanner_.GetTokPos(),0),$2);}
+  |   exp EQ exp              {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::EQ_OP,$1,$3);}
+  |   exp NEQ exp              {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::EQ_OP,$1,$3);}
+  |   exp LT exp              {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::LT_OP,$1,$3);}
+  |   exp LE exp              {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::LE_OP,$1,$3);}
+  |   exp GT exp              {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::GT_OP,$1,$3);}
+  |   exp GE exp              {$$ = new absyn::OpExp(scanner_.GetTokPos(),absyn::Oper::GE_OP,$1,$3);}
+
+  |   exp AND exp             {$$ = new absyn::IfExp(scanner_.GetTokPos(),$1,$3,absyn::IntExp(scanner_.GetTokPos(),0));}
+  |   exp OR exp              {$$ = new absyn::IfExp(scanner_.GetTokPos(),$1,new absyn::IntExp(scanner_.GetTokPos(),0),$3);}
+
+  |   ID LPAREN actuals RPAREN  {$$ = new absyn::CallExp(scanner_.GetTokPos(),$1,$3);}
+  |   ID LBRACK exp RBRACK OF exp {$$ = new absyn::}
+
+
   ;
 
-lvalue:  ID  {$$ = new absyn::SimpleVar(scanner_.GetTokPos(), $1);}
+expseq:   exp SEMICOLON expseq    {$$ = $3;}
+  |       exp SEMICOLON           {$$ = $1;}
+  ;
+
+lvalue:  ID     {$$ = new absyn::SimpleVar(scanner_.GetTokPos(), $1);}
   |  oneormore  {$$ = $1;}
   ;
 
-oneormore:  oneormore {$$ = $1;}
-  |         one       {$$ = $1;}
-
+oneormore:  lvalue DOT ID               {}
+  |         lvalue LBRACK exp RBRACK    {}
+  
  /* TODO: Put your lab3 code here */
