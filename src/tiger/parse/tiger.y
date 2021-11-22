@@ -30,30 +30,35 @@
 %token <sval> STRING
 %token <ival> INT
 
-%token 
-  COMMA COLON SEMICOLON LPAREN RPAREN LBRACK RBRACK 
-  LBRACE RBRACE DOT 
-  ASSIGN
-  ARRAY IF THEN ELSE WHILE FOR TO DO LET IN END OF 
+%token
+  COMMA COLON SEMICOLON LPAREN RPAREN LBRACK RBRACK
+  LBRACE RBRACE DOT
+  ARRAY IF THEN ELSE WHILE FOR TO DO LET IN END OF
   BREAK NIL
   FUNCTION VAR TYPE
 
-%left AND OR
-%nonassoc EQ NEQ LT LE GT GE
-%left PLUS MINUS
-%left TIMES DIVIDE
-%left UMINUS
+ /* token priority */
+ %left ASSIGN
+ %left OR
+ %left AND
+ %nonassoc EQ NEQ LT LE GT GE
+ %left PLUS MINUS
+ %left TIMES DIVIDE
+ %right UMINUS
 
-%type <exp> exp expseq opexp ifexp whileexp callexp recordexp
-%type <explist> actuals  nonemptyactuals sequencing  sequencing_exps
-%type <var>  lvalue one oneormore
+ /* TODO: Put your lab3 code here */
+
+%type <exp> exp expseq
+%type <explist> actuals nonemptyactuals sequencing sequencing_exps
+%type <var> lvalue one oneormore
 %type <declist> decs decs_nonempty
-%type <dec>  decs_nonempty_s vardec
+%type <dec> decs_nonempty_s vardec
 %type <efieldlist> rec rec_nonempty
 %type <efield> rec_one
 %type <tydeclist> tydec
-%type <tydec>  tydec_one
+%type <tydec> tydec_one
 %type <fieldlist> tyfields tyfields_nonempty
+%type <field> tyfield
 %type <ty> ty
 %type <fundeclist> fundec
 %type <fundec> fundec_one
@@ -63,115 +68,142 @@
 %%
 program:  exp  {absyn_tree_ = std::make_unique<absyn::AbsynTree>($1);};
 
-opexp: exp EQ exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::EQ_OP, $1, $3);}
-  | exp NEQ exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::NEQ_OP, $1, $3);}
-  | exp LT exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::LT_OP, $1, $3);}
-  | exp LE exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::LE_OP, $1, $3);}
-  | exp GT exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::GT_OP, $1, $3);}
-  | exp GE exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::GE_OP, $1, $3);}
-  | exp PLUS exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::PLUS_OP, $1, $3);}
-  | exp MINUS exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::MINUS_OP, $1, $3);}
-  | exp TIMES exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::TIMES_OP, $1, $3);}
-  | exp DIVIDE exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::DIVIDE_OP, $1, $3);}
-  | MINUS exp %prec UMINUS {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::MINUS_OP, new absyn::IntExp(scanner_.GetTokPos(), 0), $2);}
+lvalue:  ID  {$$ = new absyn::SimpleVar(scanner_.GetTokPos(), $1);}
+  |  oneormore  {$$ = $1;}
+  ;
+one:
+  ID DOT ID {$$ = new absyn::FieldVar(scanner_.GetTokPos(), new absyn::SimpleVar(scanner_.GetTokPos(), $1), $3);}
+  |   ID LBRACK exp RBRACK {$$ = new absyn::SubscriptVar(scanner_.GetTokPos(), new absyn::SimpleVar(scanner_.GetTokPos(), $1), $3);}
+  ;
+oneormore:
+  one {$$ = $1;}
+  |   oneormore DOT ID {$$ = new absyn::FieldVar(scanner_.GetTokPos(), $1, $3);}
+  |   oneormore LBRACK exp RBRACK {$$ = new absyn::SubscriptVar(scanner_.GetTokPos(), $1, $3);}
   ;
 
-ifexp: IF exp THEN exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $2, $4, nullptr);}
-  | IF exp THEN exp ELSE exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $2, $4, $6);}
-  | IF LPAREN exp RPAREN THEN exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $3, $6, nullptr);}
-  | IF LPAREN exp RPAREN THEN exp ELSE exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $3, $6, $8);}
-  | exp AND opexp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $1, $3, new absyn::IntExp(scanner_.GetTokPos(), 0));}
-  | exp OR opexp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $1, new absyn::IntExp(scanner_.GetTokPos(), 1), $3);}
+
+ /* TODO: Put your lab3 code here */
+
+exp:
+  lvalue {$$ = new absyn::VarExp(scanner_.GetTokPos(), $1);}
+  |   NIL {$$ = new absyn::NilExp(scanner_.GetTokPos());}
+  |   INT {$$ = new absyn::IntExp(scanner_.GetTokPos(), $1);}
+  |   STRING {$$ = new absyn::StringExp(scanner_.GetTokPos(), $1);}
+  |   MINUS exp %prec UMINUS {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::MINUS_OP, new absyn::IntExp(scanner_.GetTokPos(), 0), $2);}
+  |   exp PLUS exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::PLUS_OP, $1, $3);}
+  |   exp MINUS exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::MINUS_OP, $1, $3);}    
+  |   exp TIMES exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::TIMES_OP, $1, $3);}
+  |   exp DIVIDE exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::DIVIDE_OP, $1, $3);}
+  |   exp EQ exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::EQ_OP, $1, $3);}
+  |   exp NEQ exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::NEQ_OP, $1, $3);}
+  |   exp LT exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::LT_OP, $1, $3);}
+  |   exp LE exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::LE_OP, $1, $3);}
+  |   exp GT exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::GT_OP, $1, $3);}
+  |   exp GE exp {$$ = new absyn::OpExp(scanner_.GetTokPos(), absyn::Oper::GE_OP, $1, $3);}
+  |   exp AND exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $1, $3, new absyn::IntExp(scanner_.GetTokPos(), 0));}
+  |   exp OR exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $1, new absyn::IntExp(scanner_.GetTokPos(), 1), $3);}
+  |   ID LPAREN actuals RPAREN {$$ = new absyn::CallExp(scanner_.GetTokPos(), $1, $3);}
+  |   ID LBRACE rec RBRACE {$$ = new absyn::RecordExp(scanner_.GetTokPos(), $1, $3);}
+  |   sequencing {$$ = new absyn::SeqExp(scanner_.GetTokPos(), $1);}
+  |   lvalue ASSIGN exp {$$ = new absyn::AssignExp(scanner_.GetTokPos(), $1, $3);}
+
+  |   IF LPAREN exp RPAREN THEN exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $3, $6, nullptr);}
+  |   IF LPAREN exp RPAREN THEN exp ELSE exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $3, $6, $8);}
+  |   IF exp THEN exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $2, $4, nullptr);}
+  |   IF exp THEN exp ELSE exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $2, $4, $6);}
+  
+
+  |   WHILE exp DO exp {$$ = new absyn::WhileExp(scanner_.GetTokPos(), $2, $4);}
+  |   FOR ID ASSIGN exp TO exp DO exp {$$ = new absyn::ForExp(scanner_.GetTokPos(), $2, $4, $6, $8);}
+  |   BREAK{$$ = new absyn::BreakExp(scanner_.GetTokPos());}
+  |   LET decs IN expseq END {$$ = new absyn::LetExp(scanner_.GetTokPos(), $2, $4);}
+  |   ID LBRACK exp RBRACK OF exp {$$ = new absyn::ArrayExp(scanner_.GetTokPos(), $1, $3, $6);}
+  |   LPAREN RPAREN {$$ = new absyn::VoidExp(scanner_.GetTokPos());}
+  |   LPAREN exp RPAREN {$$ = $2;}
   ;
 
-whileexp: WHILE exp DO exp {$$ = new absyn::WhileExp(scanner_.GetTokPos(), $2, $4);}
-  | WHILE LPAREN exp RPAREN DO exp {$$ = new absyn::WhileExp(scanner_.GetTokPos(), $3, $6);}
+expseq:
+    {$$ = new absyn::SeqExp(scanner_.GetTokPos(), new absyn::ExpList());}
+  | sequencing_exps {$$ = new absyn::SeqExp(scanner_.GetTokPos(), $1);}
   ;
 
-callexp: ID LPAREN sequencing_exps RPAREN {$$ = new absyn::CallExp(scanner_.GetTokPos(), $1, $3);}
-  | ID LPAREN RPAREN {$$ = new absyn::CallExp(scanner_.GetTokPos(), $1, new absyn::ExpList());}
+actuals:
+    {$$ = new absyn::ExpList();}
+  | nonemptyactuals {$$ = $1;}
+  ;
+nonemptyactuals:
+  exp {$$ = new absyn::ExpList($1); }
+  | exp COMMA nonemptyactuals {
+      $$ = ($3)->Prepend($1);
+    }
   ;
 
-recordexp:  ID LBRACE rec RBRACE {$$ = new absyn::RecordExp(scanner_.GetTokPos(), $1, $3);}
-  |         ID LBRACE RBRACE {$$ = new absyn::RecordExp(scanner_.GetTokPos(), $1, new absyn::EFieldList());}
+sequencing:
+  LPAREN sequencing_exps RPAREN {$$ = $2;}
+  ;
+sequencing_exps:
+  exp {$$ = new absyn::ExpList($1);}
+  | exp SEMICOLON sequencing_exps { $$ = ($3)->Prepend($1);}
+
   ;
 
-exp: LET decs IN expseq END {$$ = new absyn::LetExp(scanner_.GetTokPos(), $2, $4);}
-  | ID LBRACK exp RBRACK OF exp {$$ = new absyn::ArrayExp(scanner_.GetTokPos(), $1, $3, $6);}
-  | INT {$$ = new absyn::IntExp(scanner_.GetTokPos(), $1);}
-  | STRING {$$ = new absyn::StringExp(scanner_.GetTokPos(), $1);}
-  | NIL {$$ = new absyn::NilExp(scanner_.GetTokPos());}
-  | BREAK {$$ = new absyn::BreakExp(scanner_.GetTokPos());}
-  | lvalue {$$ = new absyn::VarExp(scanner_.GetTokPos(), $1);}
-  | lvalue ASSIGN exp {$$ = new absyn::AssignExp(scanner_.GetTokPos(), $1, $3);}
-  | LPAREN sequencing_exps RPAREN {$$ = new absyn::SeqExp(scanner_.GetTokPos(), $2);}
-  | LPAREN RPAREN {$$ = new absyn::VoidExp(scanner_.GetTokPos());}
-  | FOR ID ASSIGN exp TO exp DO exp {$$ = new absyn::ForExp(scanner_.GetTokPos(), $2, $4, $6, $8);}
-  | recordexp         
-  | ifexp
-  | whileexp
-  | callexp
-  | opexp
+decs:
+    {$$ = nullptr;}
+  |   decs_nonempty {$$ = $1;}
+  ;
+decs_nonempty:
+  decs_nonempty_s {$$ = new absyn::DecList($1);}
+  |   decs_nonempty_s decs_nonempty {$$ = ($2)->Prepend($1);}
+  ;
+decs_nonempty_s:
+  fundec {$$ = new absyn::FunctionDec(scanner_.GetTokPos(), $1);}
+  |   vardec {$$ = $1;}
+  |   tydec {$$ = new absyn::TypeDec(scanner_.GetTokPos(), $1);}
+  ;
+vardec:
+  VAR ID ASSIGN exp {$$ = new absyn::VarDec(scanner_.GetTokPos(), $2, nullptr, $4);}
+  |   VAR ID COLON ID ASSIGN exp  {$$ = new absyn::VarDec(scanner_.GetTokPos(), $2, $4, $6);}
   ;
 
-rec: rec_one {$$ = new absyn::EFieldList($1);}
-  | rec_one COMMA rec {$$ = ($3)->Prepend($1);}
+rec:
+    {$$ = new absyn::EFieldList();}
+  |   rec_nonempty {$$ = $1;}
+  ;
+rec_nonempty:
+  rec_one {$$ = new absyn::EFieldList($1);}
+  |   rec_one COMMA rec_nonempty {$$ = ($3)->Prepend($1);}
+  ;
+rec_one:
+  ID EQ exp {$$ = new absyn::EField($1, $3);}
   ;
 
-rec_one: ID EQ exp {$$ = new absyn::EField($1, $3);}
+tydec:
+  tydec_one {$$ = new absyn::NameAndTyList($1);}
+  |   tydec_one tydec {$$ = ($2)->Prepend($1);}
+  ;
+tydec_one:
+  TYPE ID EQ ty {$$ = new absyn::NameAndTy($2, $4);}
   ;
 
-expseq: sequencing_exps {$$ = new absyn::SeqExp(scanner_.GetTokPos(), $1);}
+tyfields:
+    {$$ = new absyn::FieldList();}
+  |   tyfields_nonempty {$$ = $1;}
+  ;
+tyfields_nonempty:
+  ID COLON ID { $$ = new absyn::FieldList(new absyn::Field(scanner_.GetTokPos(), $1, $3));}
+  |   ID COLON ID COMMA tyfields_nonempty { $$ = ($5)->Prepend(new absyn::Field(scanner_.GetTokPos(), $1, $3));}
+  ;
+ty:
+  ID {$$ = new absyn::NameTy(scanner_.GetTokPos(), $1);}
+  |   LBRACE tyfields RBRACE {$$ = new absyn::RecordTy(scanner_.GetTokPos(), $2);}
+  |   ARRAY OF ID {$$ = new absyn:: ArrayTy(scanner_.GetTokPos(), $3);}
   ;
 
-sequencing_exps: exp {$$ = new absyn::ExpList($1);}
-  | exp COMMA sequencing_exps {$$ = ($3)->Prepend($1);}
-  | exp SEMICOLON sequencing_exps {$$ = ($3)->Prepend($1);}
+fundec:
+  fundec_one {$$ = new absyn::FunDecList($1);}
+  |   fundec_one fundec {$$ = ($2)->Prepend($1);}
   ;
-
-decs: decs_nonempty_s {$$ = new absyn::DecList($1);}
-  | decs_nonempty_s decs {$$ = ($2)->Prepend($1);}
-  | vardec {$$ = new absyn::DecList($1);}
-  | vardec decs {$$ = ($2)->Prepend($1);}
-  ;
-
-decs_nonempty_s: tydec {$$ = new absyn::TypeDec(scanner_.GetTokPos(), $1);}
-  | fundec {$$ = new absyn::FunctionDec(scanner_.GetTokPos(), $1);}
-  ;
-
-tydec: TYPE tydec_one {$$ = new absyn::NameAndTyList($2);}
-  | TYPE tydec_one tydec {$$ = ($3)->Prepend($2);}
-  ;
-
-fundec: FUNCTION fundec_one {$$ = new absyn::FunDecList($2);}
-  | FUNCTION fundec_one fundec {$$ = ($3)->Prepend($2);}
-  ;
-
-tydec_one: ID EQ ty {$$ = new absyn::NameAndTy($1, $3);}
-  ;
-
-fundec_one: ID LPAREN tyfields RPAREN COLON ID EQ exp {$$ = new absyn::FunDec(scanner_.GetTokPos(), $1, $3, $6, $8);}
-  | ID LPAREN tyfields RPAREN EQ exp {$$ = new absyn::FunDec(scanner_.GetTokPos(), $1, $3, nullptr, $6);}
-  | ID LPAREN tyfields RPAREN COLON ID EQ LPAREN exp RPAREN {$$ = new absyn::FunDec(scanner_.GetTokPos(), $1, $3, $6, $9);}
-  | ID LPAREN tyfields RPAREN EQ LPAREN exp RPAREN {$$ = new absyn::FunDec(scanner_.GetTokPos(), $1, $3, nullptr, $7);}
-  ;
-
-ty: ARRAY OF ID {$$ = new absyn::ArrayTy(scanner_.GetTokPos(), $3);}
-  | ID {$$ = new absyn::NameTy(scanner_.GetTokPos(), $1);}
-  | LBRACE tyfields RBRACE {$$ = new absyn::RecordTy(scanner_.GetTokPos(), $2);}
-  ;
-
-tyfields: {$$ =new absyn::FieldList();}
-  | ID COLON ID {$$ = new absyn::FieldList(new absyn::Field(scanner_.GetTokPos(), $1, $3));}
-  | ID COLON ID COMMA tyfields {$$ = ($5)->Prepend(new absyn::Field(scanner_.GetTokPos(), $1, $3));}
-  ;
-
-lvalue: lvalue DOT ID {$$ = new absyn::FieldVar(scanner_.GetTokPos(), $1, $3);}
-  | ID LBRACK exp RBRACK {$$ = new absyn::SubscriptVar(scanner_.GetTokPos(), new absyn::SimpleVar(scanner_.GetTokPos(), $1), $3);}
-  | lvalue LBRACK exp RBRACK {$$ = new absyn::SubscriptVar(scanner_.GetTokPos(), $1, $3);}
-  | ID {$$ = new absyn::SimpleVar(scanner_.GetTokPos(), $1);}
-  ;
-
-vardec: VAR ID ASSIGN exp {$$ = new absyn::VarDec(scanner_.GetTokPos(),$2, nullptr, $4);}
-  | VAR ID COLON ID ASSIGN exp {$$ = new absyn::VarDec(scanner_.GetTokPos(), $2, $4, $6);}
+fundec_one:
+  FUNCTION ID LPAREN tyfields RPAREN EQ exp {$$ = new absyn::FunDec(scanner_.GetTokPos(), $2, $4, nullptr, $7);}
+  |   FUNCTION ID LPAREN tyfields RPAREN COLON ID EQ exp {$$ = new absyn::FunDec(scanner_.GetTokPos(), $2, $4, $7, $9);}
   ;
