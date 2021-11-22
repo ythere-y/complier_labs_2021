@@ -14,8 +14,8 @@ namespace esc {
 
 class EscapeEntry {
 public:
-  int depth_;
-  bool *escape_;
+  int depth_;    // 调用深度
+  bool *escape_; // 是否逃逸
 
   EscapeEntry(int depth, bool *escape) : depth_(depth), escape_(escape) {}
 };
