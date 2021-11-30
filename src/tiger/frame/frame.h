@@ -64,6 +64,7 @@ public:
   [[nodiscard]] virtual temp::Temp *ReturnValue() = 0;
 
   temp::Map *temp_map_;
+
 protected:
   std::vector<temp::Temp *> regs_;
 };
@@ -71,9 +72,8 @@ protected:
 class Access {
 public:
   /* TODO: Put your lab5 code here */
-  
+
   virtual ~Access() = default;
-  
 };
 
 class Frame {
@@ -124,11 +124,16 @@ public:
 class Frags {
 public:
   Frags() = default;
+<<<<<<< HEAD
   void PushBack(Frag *frag) { frags_.emplace_back(frag); }
   const std::list<Frag*> &GetList() { return frags_; }
+=======
+  void PushBack(Frag *frag) { frags_.push_back(frag); }
+  const std::list<Frag *> &GetList() { return frags_; }
+>>>>>>> lab5-part1
 
 private:
-  std::list<Frag*> frags_;
+  std::list<Frag *> frags_;
 };
 
 /* TODO: Put your lab5 code here */
