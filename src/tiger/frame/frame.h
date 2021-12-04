@@ -5,10 +5,9 @@
 #include <memory>
 #include <string>
 
+#include "tiger/codegen/assem.h"
 #include "tiger/frame/temp.h"
 #include "tiger/translate/tree.h"
-#include "tiger/codegen/assem.h"
-
 
 namespace frame {
 
@@ -72,12 +71,25 @@ protected:
 class Access {
 public:
   /* TODO: Put your lab5 code here */
-
+  Access()) : {}
   virtual ~Access() = default;
+  virtual tree::Exp *ToExp(tree::Exp *framePtr) const = 0;
 };
 
 class Frame {
   /* TODO: Put your lab5 code here */
+public:
+  temp::Label *label_;
+  std::vector<Access> fromals;
+  std::vector<Access> locals;
+  unsigned int frame_size;
+  unsigned int max_argnum;
+  tree::StmList *view_shift;
+  int s_offset;
+
+  Frame(temp::Label *name, std::vector<bool> escapes) {}
+
+  virtual Access *allocLocal(bool escape) = 0;
 };
 
 /**
@@ -97,7 +109,8 @@ public:
    *Generate assembly for main program
    * @param out FILE object for output assembly file
    */
-  virtual void OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const = 0;
+  virtual void OutputAssem(FILE *out, OutputPhase phase,
+                           bool need_ra) const = 0;
 };
 
 class StringFrag : public Frag {
@@ -124,13 +137,8 @@ public:
 class Frags {
 public:
   Frags() = default;
-<<<<<<< HEAD
   void PushBack(Frag *frag) { frags_.emplace_back(frag); }
-  const std::list<Frag*> &GetList() { return frags_; }
-=======
-  void PushBack(Frag *frag) { frags_.push_back(frag); }
   const std::list<Frag *> &GetList() { return frags_; }
->>>>>>> lab5-part1
 
 private:
   std::list<Frag *> frags_;

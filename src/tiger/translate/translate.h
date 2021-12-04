@@ -32,6 +32,8 @@ public:
   Level *parent_;
 
   /* TODO: Put your lab5 code here */
+
+  static Level *NewLevel(Level *parent,temp::Label *name,u
 };
 
 class ProgTr {
