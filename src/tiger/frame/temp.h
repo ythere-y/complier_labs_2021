@@ -66,13 +66,12 @@ public:
   TempList(std::initializer_list<Temp *> list) : temp_list_(list) {}
   TempList() = default;
   TempList(TempList *most, int len) {
-    std::list<Temp *> get = most->GetList();
     for (int i = 0; i < len; i++) {
-      this->Append(get[i]);
+      this->Append(most->NthTemp(i));
     }
   }
   void Append(Temp *t) { temp_list_.push_back(t); }
-  [[nodiscard]] Temp *NthTemp(int i) const { return temp_list_[i]; };
+  [[nodiscard]] Temp *NthTemp(int i) const;
   [[nodiscard]] const std::list<Temp *> &GetList() const { return temp_list_; }
 
 private:

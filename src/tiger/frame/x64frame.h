@@ -8,17 +8,23 @@
 #include "tiger/frame/frame.h"
 
 namespace frame {
+
+static std::string reg_names[] = {
+    "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",
+    "$t0",   "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7",
+    "$s0",   "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",
+    "$t8",   "$t9", "$k0", "$k1", "$gp", "$sp", "$fp", "$ra"};
 class X64RegManager : public RegManager {
   /* TODO: Put your lab5 code here */
 private:
-  temp::TempList fast_get(int start, int end) {
+  temp::TempList *fast_get(int start, int end) {
     temp::TempList *res;
     for (int i = start; i < end; i++) {
       res->Append(regs_[i]);
     }
     return res;
   }
-  temp::TempList fast_get(int start_1, int end_1, int start_2, int end_2) {
+  temp::TempList *fast_get(int start_1, int end_1, int start_2, int end_2) {
     temp::TempList *res;
     for (int i = start_1; i < end_1; i++) {
       res->Append(regs_[i]);
@@ -32,42 +38,14 @@ private:
 public:
   X64RegManager() : RegManager() {
     //加入32个寄存器
+    std::string *name;
+
     for (int i = 0; i < 32; i++) {
       regs_.push_back(temp::TempFactory::NewTemp());
     }
-    { // map增加元素
-      temp_map_->Enter(regs_[0], &std::string("$zero"));
-      temp_map_->Enter(regs_[1], &std::string("$at"));
-      temp_map_->Enter(regs_[2], &std::string("$v0"));
-      temp_map_->Enter(regs_[3], &std::string("$v1"));
-      temp_map_->Enter(regs_[4], &std::string("$a0"));
-      temp_map_->Enter(regs_[5], &std::string("$a1"));
-      temp_map_->Enter(regs_[6], &std::string("$a2"));
-      temp_map_->Enter(regs_[7], &std::string("$a3"));
-      temp_map_->Enter(regs_[8], &std::string("$t0"));
-      temp_map_->Enter(regs_[9], &std::string("$t1"));
-      temp_map_->Enter(regs_[10], &std::string("$t2"));
-      temp_map_->Enter(regs_[11], &std::string("$t3"));
-      temp_map_->Enter(regs_[12], &std::string("$t4"));
-      temp_map_->Enter(regs_[13], &std::string("$t5"));
-      temp_map_->Enter(regs_[14], &std::string("$t6"));
-      temp_map_->Enter(regs_[15], &std::string("$t7"));
-      temp_map_->Enter(regs_[16], &std::string("$s0"));
-      temp_map_->Enter(regs_[17], &std::string("$s1"));
-      temp_map_->Enter(regs_[18], &std::string("$s2"));
-      temp_map_->Enter(regs_[19], &std::string("$s3"));
-      temp_map_->Enter(regs_[20], &std::string("$s4"));
-      temp_map_->Enter(regs_[21], &std::string("$s5"));
-      temp_map_->Enter(regs_[22], &std::string("$s6"));
-      temp_map_->Enter(regs_[23], &std::string("$s7"));
-      temp_map_->Enter(regs_[24], &std::string("$t8"));
-      temp_map_->Enter(regs_[25], &std::string("$t9"));
-      temp_map_->Enter(regs_[26], &std::string("$k0"));
-      temp_map_->Enter(regs_[27], &std::string("$k1"));
-      temp_map_->Enter(regs_[28], &std::string("$gp"));
-      temp_map_->Enter(regs_[29], &std::string("$sp"));
-      temp_map_->Enter(regs_[30], &std::string("$fp"));
-      temp_map_->Enter(regs_[31], &std::string("$ra"));
+    for (int i = 0; i < 32; i++) {
+      name = &(reg_names[i]);
+      temp_map_->Enter(regs_[i], name);
     }
   }
   ~X64RegManager() {}
