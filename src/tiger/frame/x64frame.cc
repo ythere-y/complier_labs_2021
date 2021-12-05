@@ -26,6 +26,14 @@ public:
 class X64Frame : public Frame {
   /* TODO: Put your lab5 code here */
 public:
+  temp::Label *label_;
+  std::vector<Access *> fromals;
+  std::vector<Access *> locals;
+  unsigned int frame_size;
+  unsigned int max_argnum;
+  tree::StmList *view_shift;
+  int s_offset;
+
   X64Frame(){};
   X64Frame(temp::Label *name, std::vector<bool> escapes);
   Access *allocLocal(bool escape);
@@ -34,8 +42,7 @@ public:
 };
 /* TODO: Put your lab5 code here */
 
-X64Frame::X64Frame(temp::Label *name, std::vector<bool> escapes) {
-  reg_manager = new X64RegManager();
+X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
   this->label_ = name;
   this->fromals = std::vector<Access *>();
   this->locals = std::vector<Access *>();
@@ -46,7 +53,7 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> escapes) {
   int formal_offset = reg_manager->WordSize();
 
   int count = 0;
-  for (auto it_es = escapes.begin(); it_es != escapes.end(); it_es++) {
+  for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
     Access *add_ac;
     if ((*it_es)) {
       add_ac = new InFrameAccess(count * formal_offset);

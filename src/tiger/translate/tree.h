@@ -166,7 +166,8 @@ public:
 
   virtual void Print(FILE *out, int d) const = 0;
   virtual canon::StmAndExp Canon() = 0;
-  virtual temp::Temp *Munch(assem::InstrList &instr_list, std::string_view fs) = 0;
+  virtual temp::Temp *Munch(assem::InstrList &instr_list,
+                            std::string_view fs) = 0;
 };
 
 class BinopExp : public Exp {
@@ -188,6 +189,11 @@ public:
   Exp *exp_;
 
   explicit MemExp(Exp *exp) : exp_(exp) {}
+
+  explicit MemExp(Exp *left, int right) {
+    exp_ = new BinopExp(BinOp::PLUS_OP, left, new ConstExp(right));
+  }
+
   ~MemExp() override;
 
   void Print(FILE *out, int d) const override;

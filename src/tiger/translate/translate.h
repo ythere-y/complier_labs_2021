@@ -20,7 +20,6 @@ class Access {
 public:
   Level *level_;
   frame::Access *access_;
-
   Access(Level *level, frame::Access *access)
       : level_(level), access_(access) {}
   static Access *AllocLocal(Level *level, bool escape);
@@ -32,8 +31,12 @@ public:
   Level *parent_;
 
   /* TODO: Put your lab5 code here */
-
-  static Level *NewLevel(Level *parent,temp::Label *name,u
+  Level(frame::Frame *frame, Level *parent) : frame_(frame), parent_(parent) {}
+  Level(Level *parent, temp::Label *name, absyn::FieldList *params) {
+    // TODO:需要想办法构建Frame
+    frame_ = new frame::Frame();
+    parent_ = parent;
+  }
 };
 
 class ProgTr {
@@ -43,7 +46,6 @@ public:
   ProgTr(std::unique_ptr<absyn::AbsynTree> absyn_tree,
          std::unique_ptr<err::ErrorMsg> erromsg)
       : absyn_tree_(std::move(absyn_tree)), errormsg_(std::move(erromsg)),
-
         tenv_(std::make_unique<env::TEnv>()),
         venv_(std::make_unique<env::VEnv>()) {}
 
