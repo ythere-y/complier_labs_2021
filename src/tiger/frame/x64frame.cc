@@ -26,16 +26,8 @@ public:
 class X64Frame : public Frame {
   /* TODO: Put your lab5 code here */
 public:
-  temp::Label *label_;
-  std::vector<Access *> fromals;
-  std::vector<Access *> locals;
-  unsigned int frame_size;
-  unsigned int max_argnum;
-  tree::StmList *view_shift;
-  int s_offset;
-
   X64Frame(){};
-  X64Frame(temp::Label *name, std::vector<bool> escapes);
+  X64Frame(temp::Label *name, std::vector<bool> *escapes);
   Access *allocLocal(bool escape);
   temp::Label *get_name() { return this->label_; }
   std::vector<Access *> get_formals() { return this->fromals; }

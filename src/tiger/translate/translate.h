@@ -34,9 +34,9 @@ public:
   Level(frame::Frame *frame, Level *parent) : frame_(frame), parent_(parent) {}
   Level(Level *parent, temp::Label *name, absyn::FieldList *params) {
     // TODO:需要想办法构建Frame
-    frame_ = new frame::Frame();
     parent_ = parent;
   }
+  Level() {}
 };
 
 class ProgTr {
