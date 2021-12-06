@@ -9,13 +9,11 @@ namespace {
 
 constexpr int maxlen = 1024;
 
-
 } // namespace
 
 namespace cg {
 
-void CodeGen::Codegen() {
-  /* TODO: Put your lab5 code here */
+void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
 }
 
 void AssemInstr::Print(FILE *out, temp::Map *map) const {
@@ -30,10 +28,15 @@ namespace tree {
 
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  // tree::MoveStm *s = (tree::MoveStm*)
 }
 
 void LabelStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  // TODO:这个string是啥
+  // temp::Label *label = (tree::LabelStm *)label_;
+  assem::LabelInstr *res = new assem::LabelInstr(label_->Name(), label_);
+  instr_list.Append(res);
 }
 
 void JumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
@@ -80,7 +83,8 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
 }
 
-temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list, std::string_view fs) {
+temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
+                                   std::string_view fs) {
   /* TODO: Put your lab5 code here */
 }
 

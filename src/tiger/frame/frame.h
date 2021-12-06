@@ -146,6 +146,20 @@ private:
 
 /* TODO: Put your lab5 code here */
 
+static tree::Exp *externalCall(std::string s, tree::ExpList *args) {
+  return new tree::CallExp(new tree::NameExp(temp::LabelFactory::NamedLabel(s)),
+                           args);
+}
+
+class X64Frame : public Frame {
+  /* TODO: Put your lab5 code here */
+public:
+  X64Frame(){};
+  X64Frame(temp::Label *name, std::vector<bool> *escapes);
+  Access *allocLocal(bool escape);
+  temp::Label *get_name() { return this->label_; }
+  std::vector<Access *> get_formals() { return this->fromals; }
+};
 } // namespace frame
 
 #endif

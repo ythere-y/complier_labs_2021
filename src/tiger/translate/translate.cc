@@ -524,11 +524,12 @@ tr::ExpAndTy *RecordExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   temp::Temp *reg = temp::TempFactory::NewTemp();
   tree::ExpList *inner_list = new tree::ExpList();
   inner_list->Append(new tree::ConstExp(count * reg_manager->WordSize()));
-  tree::CallExp *to = new tree::CallExp(
-      new tree::NameExp(temp::LabelFactory::NamedLabel("allocRecord")),
-      inner_list);
+  // tree::CallExp *to = new tree::CallExp(
+  //     new tree::NameExp(temp::LabelFactory::NamedLabel("allocRecord")),
+  //     inner_list);
 
-  tree::Stm *stm = new tree::MoveStm(new tree::TempExp(reg), to);
+  tree::Stm *stm = new tree::MoveStm(new tree::TempExp(reg),
+                                     frame::externalCall("allocRecord", list));
 
   count = 0;
   auto get_list = list->GetList();
@@ -955,7 +956,7 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate FunctionDec level %s label %s\n", level, label);
 #endif
-  sym::Table<int> *check_table = new sym::Table<int>();
+  env::VEnvPtr check_table = new sym::Table<env::EnvEntry>();
 
   auto get_funcs = functions_->GetList();
   auto it_funcs = get_funcs.begin();
@@ -967,7 +968,7 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       continue;
     }
     // 获取函数的信息-name-params
-    check_table->Enter((*it_funcs)->name_, (int *)1);
+    check_table->Enter((*it_funcs)->name_, new env::EnvEntry(false));
     type::TyList *formal_tys =
         (*it_funcs)->params_->MakeFormalTyList(tenv, errormsg);
     std::vector<bool> *escapes(0);

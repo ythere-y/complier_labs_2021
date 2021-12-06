@@ -11,7 +11,9 @@ public:
   explicit InFrameAccess(int offset) : offset(offset) {}
   /* TODO: Put your lab5 code here */
   // TODO:这是啥
-  tree::Exp *ToExp(tree::Exp *framePtr) const { return nullptr; }
+  tree::Exp *ToExp(tree::Exp *framePtr) const {
+    return new tree::MemExp(framePtr, new tree::ConstExp(offset));
+  }
 };
 
 class InRegAccess : public Access {
@@ -23,15 +25,6 @@ public:
   tree::Exp *ToExp(tree::Exp *framePtr) const { return new tree::TempExp(reg); }
 };
 
-class X64Frame : public Frame {
-  /* TODO: Put your lab5 code here */
-public:
-  X64Frame(){};
-  X64Frame(temp::Label *name, std::vector<bool> *escapes);
-  Access *allocLocal(bool escape);
-  temp::Label *get_name() { return this->label_; }
-  std::vector<Access *> get_formals() { return this->fromals; }
-};
 /* TODO: Put your lab5 code here */
 
 X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {

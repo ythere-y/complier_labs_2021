@@ -34,6 +34,13 @@ public:
   Level(frame::Frame *frame, Level *parent) : frame_(frame), parent_(parent) {}
   Level(Level *parent, temp::Label *name, absyn::FieldList *params) {
     // TODO:需要想办法构建Frame
+    std::vector<bool> *escapes = new std::vector<bool>(0);
+    auto get_par = params->GetList();
+    auto it_par = get_par.begin();
+    for (; it_par != get_par.end(); it_par++) {
+      escapes->push_back((*it_par)->escape_);
+    }
+    frame_ = new frame::X64Frame(name, escapes);
     parent_ = parent;
   }
   Level() {}
