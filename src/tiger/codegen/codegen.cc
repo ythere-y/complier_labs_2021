@@ -12,6 +12,8 @@ constexpr int maxlen = 1024;
 } // namespace
 
 namespace cg {
+#define SAME(type_a, type_b) typeid(type_a) == typeid(type_b);
+#define IS_PLUS(type) (type)->op_ == tree::BinOp::PLUS_OP;
 static temp::TempList *saved;
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs);
 static void restoreCalleeRegs(assem::InstrList &instr_list,
@@ -129,6 +131,7 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+
   temp::TempList *dst = nullptr;
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
@@ -242,17 +245,19 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
 
   temp::TempList *args_list = args_->MunchArgs(instr_list, fs);
-  char temp[256];
-  sprintf(
-      temp, "call %s",
-      temp::LabelFactory::LabelString(((tree::NameExp *)fun_)->name_).c_str());
+  temp::Temp *r = fun_->Munch(instr_list, fs);
+  args_list->Append(r);
 
+  instr_list.Append(new assem::OperInstr(
+      "call `s0\n", reg_manager->CalleeSaves(), args_list, nullptr));
+  return r;
+  // TODO:这里修改较多
   temp::TempList *dst = reg_manager->CalleeSaves();
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
 
   instr_list.Append(
-      new assem::OperInstr(std::string(temp), dst, nullptr, jumps));
+      new assem::OperInstr(std::string("hello"), dst, nullptr, jumps));
 
   temp::Temp *add_one = temp::TempFactory::NewTemp();
   dst = new temp::TempList(add_one);
