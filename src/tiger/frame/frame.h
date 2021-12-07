@@ -86,7 +86,8 @@ public:
   unsigned int max_argnum;
   tree::StmList *view_shift;
   int s_offset;
-  Frame(){};
+
+  Frame() {}
   Frame(temp::Label *name, std::vector<bool> *escapes) {}
 
   virtual Access *allocLocal(bool escape) = 0;
@@ -155,6 +156,7 @@ class X64Frame : public Frame {
   /* TODO: Put your lab5 code here */
 public:
   X64Frame(){};
+  temp::Label *getLabel() { return label_; }
   X64Frame(temp::Label *name, std::vector<bool> *escapes);
   Access *allocLocal(bool escape);
   temp::Label *get_name() { return this->label_; }
