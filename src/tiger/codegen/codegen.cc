@@ -13,12 +13,14 @@ constexpr int maxlen = 1024;
 
 namespace cg {
 static temp::TempList *saved;
+static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs);
+static void restoreCalleeRegs(assem::InstrList &instr_list,
+                              std::string_view fs);
 
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
-  std::list<temp::Temp *> list_init;
-  for (int i = 0; i < 6; i++)
-    list_init.push_back(temp::TempFactory::NewTemp());
-  saved = new temp::TempList((std::initializer_list<temp::Temp *>)list_init);
+  for (int i = 0; i < 6; i++) {
+    saved->Append(temp::TempFactory::NewTemp());
+  }
   assem::InstrList instr_list;
 
   saveCalleeRegs(instr_list, fs_);
@@ -28,24 +30,22 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
     (*it_stm)->Munch(instr_list, fs_);
   }
   restoreCalleeRegs(instr_list, fs_);
+  // TODO:需要rsp和RV，是啥？
+  temp::TempList *retlist = reg_manager->ReturnSink();
 
-  retlist = new temp::TempList(reg_manager->ReturnSink());
-
-  instr_list.Append(new assem::OperInstr("", nullptr, retlist));
-  instr_list.Append(new assem::Targets(nullptr), nullptr);
+  assem::Targets *jumps = new assem::Targets(nullptr);
+  instr_list.Append(new assem::OperInstr("", nullptr, retlist, jumps));
 }
 
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs) {
   instr_list.Append(
-      new assem::MoveInstr("movq `s0,`d0", new temp::TempList(saved),
-                           new temp::TempList(reg_manager->CalleeSaves())));
+      new assem::MoveInstr("movq `s0,`d0", saved, reg_manager->CalleeSaves()));
 }
 
 static void restoreCalleeRegs(assem::InstrList &instr_list,
                               std::string_view fs) {
-  instr_list.Append(new assem::MoveInstr(
-      "movq `s0,`d0", new temp::TempList(reg_manager->CalleeSaves()),
-      new temp::TempList(saved)));
+  instr_list.Append(
+      new assem::MoveInstr("movq `s0,`d0", reg_manager->CalleeSaves(), saved));
 }
 
 void AssemInstr::Print(FILE *out, temp::Map *map) const {
@@ -87,7 +87,6 @@ void JumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  temp::Label *label = exp_->name_;
   temp::TempList *dst = nullptr;
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
@@ -122,7 +121,9 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   }
   std::string assem_name =
       str.append(temp::LabelFactory::LabelString(true_label_));
-  jumps = new assem::Targets(new temp::TempList(true_label_));
+  std::vector<temp::Label *> *tmp_labels =
+      new std::vector<temp::Label *>(1, true_label_);
+  jumps = new assem::Targets(tmp_labels);
   instr_list.Append(new assem::OperInstr(assem_name, nullptr, nullptr, jumps));
 }
 
@@ -149,7 +150,7 @@ void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void ExpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  exp_->Munch();
+  exp_->Munch(instr_list, fs);
 }
 
 temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
@@ -179,28 +180,25 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   case tree::DIV_OP:
 
     instr_list.Append(new assem::OperInstr(
-        "cltd", new temp::TempList(reg_manager->ReturnSink()),
+        "cltd", reg_manager->ReturnSink(),
         new temp::TempList(reg_manager->ReturnValue()), jumps));
 
     auto get_return_sink = reg_manager->ReturnSink()->GetList();
     for (auto it_return_sink = get_return_sink.begin();
-         it_return_sink !get_return_sink.end(), it_return_sink++)
+         it_return_sink != get_return_sink.end(); it_return_sink++)
       src->Append((*it_return_sink));
 
-    instr_list.Append(new assem::OperInstr(
-        "idivq `s0", new temp::TempList(reg_manager->ReturnSink()), src,
-        jumps));
-    instr_list.Append(new assem::MoveInstr(
-        "movq `s0,`d0", dst, new temp::TempList(reg_manager->ReturnValue())));
-    break;
-  default:
+    dst = reg_manager->ReturnSink();
+    instr_list.Append(new assem::OperInstr("idivq `s0", dst, src, jumps));
+    src = new temp::TempList(reg_manager->ReturnValue());
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
     break;
   }
 }
 
 temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  temp::Temp *r = exp_->Munch;
+  temp::Temp *r = exp_->Munch(instr_list, fs);
   temp::Temp *reg = temp::TempFactory::NewTemp();
   instr_list.Append(
       new assem::OperInstr("movq (`s0),`d0", new temp::TempList(reg),
@@ -221,7 +219,7 @@ temp::Temp *EseqExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   char temp[256];
-  sprintf(temp, "\tleaq %s(%%rip), `d0 ", (name_->Name().c_str));
+  sprintf(temp, "\tleaq %s(%%rip), `d0 ", (name_->Name().c_str()));
   temp::Temp *reg = temp::TempFactory::NewTemp();
   instr_list.Append(new assem::MoveInstr(std::string(temp),
                                          new temp::TempList(reg), nullptr));
@@ -242,14 +240,14 @@ temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  temp::TempList * args_->MunchArgs(instr_list, fs);
+
+  temp::TempList *args_list = args_->MunchArgs(instr_list, fs);
   char temp[256];
   sprintf(
       temp, "call %s",
       temp::LabelFactory::LabelString(((tree::NameExp *)fun_)->name_).c_str());
 
-  temp::TempList *args_list = reg_manager->CalleeSaves();
-  temp::TempList *dst = new temp::TempList(reg_manager->CalleeSaves());
+  temp::TempList *dst = reg_manager->CalleeSaves();
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
 
