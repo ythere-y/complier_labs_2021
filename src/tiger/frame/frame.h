@@ -147,11 +147,10 @@ private:
 
 /* TODO: Put your lab5 code here */
 
-static tree::Exp *externalCall(std::string s, tree::ExpList *args) {
-  return new tree::CallExp(new tree::NameExp(temp::LabelFactory::NamedLabel(s)),
-                           args);
-}
-
+static tree::Exp *externalCall(std::string s, tree::ExpList *args);
+static tree::Stm *ProcEntryExit1(Frame *frame, tree::Stm *stm);
+static assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list);
+static assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list);
 class X64Frame : public Frame {
   /* TODO: Put your lab5 code here */
 public:
