@@ -54,10 +54,7 @@ public:
          std::unique_ptr<err::ErrorMsg> erromsg)
       : absyn_tree_(std::move(absyn_tree)), errormsg_(std::move(erromsg)),
         tenv_(std::make_unique<env::TEnv>()),
-        venv_(std::make_unique<env::VEnv>()) {
-    FillBaseTEnv();
-    FillBaseVEnv();
-  }
+        venv_(std::make_unique<env::VEnv>()) {}
 
   /**
    * Translate IR tree
@@ -80,8 +77,8 @@ private:
   std::unique_ptr<env::VEnv> venv_;
 
   // Fill base symbol for var env and type env
-  void FillBaseVEnv(){};
-  void FillBaseTEnv(){};
+  void FillBaseVEnv();
+  void FillBaseTEnv();
 };
 
 } // namespace tr

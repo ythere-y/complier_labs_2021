@@ -82,7 +82,8 @@ public:
   temp::Label *label_;
   std::vector<Access *> *fromals_;
   std::vector<Access *> *locals_;
-  tree::StmList *viewShift;
+  tree::StmList *view_shift_;
+  int frame_size_;
   int s_offset_;
   int maxArgs = 0;
 
@@ -95,6 +96,11 @@ public:
 /**
  * Fragments
  */
+
+tree::Exp *externalCall(std::string s, tree::ExpList *args);
+tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm);
+assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list);
+assem::Proc *ProcEntryExit3(frame::Frame *frame, assem::InstrList *instr_list);
 
 class Frag {
 public:
@@ -129,7 +135,10 @@ public:
   tree::Stm *body_;
   Frame *frame_;
 
-  ProcFrag(tree::Stm *body, Frame *frame) : body_(body), frame_(frame) {}
+  ProcFrag(tree::Stm *body, Frame *frame) {
+    body_ = frame::ProcEntryExit1(frame, body);
+    frame_ = frame;
+  }
 
   void OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const override;
 };
@@ -146,10 +155,6 @@ private:
 
 /* TODO: Put your lab5 code here */
 
-static tree::Exp *externalCall(std::string s, tree::ExpList *args);
-static tree::Stm *ProcEntryExit1(Frame *frame, tree::Stm *stm);
-static assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list);
-static assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list);
 class X64Frame : public Frame {
   /* TODO: Put your lab5 code here */
 public:
@@ -158,7 +163,7 @@ public:
   X64Frame(temp::Label *name, std::vector<bool> *escapes);
   Access *allocLocal(bool escape);
   temp::Label *get_name() { return this->label_; }
-  std::vector<Access *> get_formals() { return this->fromals; }
+  std::vector<Access *> *get_formals() { return this->fromals_; }
 };
 } // namespace frame
 

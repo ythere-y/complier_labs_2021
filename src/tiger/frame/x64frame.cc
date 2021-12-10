@@ -29,11 +29,11 @@ public:
 
 X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
   this->label_ = name;
-  this->fromals = std::vector<Access *>();
-  this->locals = std::vector<Access *>();
-  this->view_shift = new tree::StmList();
-  tree::StmList *view_tail = view_shift;
-  this->s_offset = -reg_manager->WordSize();
+  this->fromals_ = new std::vector<Access *>();
+  this->locals_ = new std::vector<Access *>();
+  this->view_shift_ = new tree::StmList();
+  tree::StmList *view_tail = view_shift_;
+  this->s_offset_ = -reg_manager->WordSize();
 
   int formal_offset = reg_manager->WordSize();
 
@@ -46,42 +46,43 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
       add_ac =
           new InRegAccess(reg_manager->GetRegister(count)); //用一个寄存器来存
     }
-    fromals.push_back(add_ac);
+    fromals_->push_back(add_ac);
     count++;
   }
 }
 
 Access *X64Frame::allocLocal(bool escape) {
   if (escape) {
-    frame_size++;
-    return new InFrameAccess(-reg_manager->WordSize() * (this->frame_size));
+    frame_size_++;
+    return new InFrameAccess(-reg_manager->WordSize() * (this->frame_size_));
   } else {
-    return new InRegAccess(reg_manager->GetRegister(frame_size)); //创造一个新的
+    return new InRegAccess(
+        reg_manager->GetRegister(frame_size_)); //创造一个新的
   }
 }
 
-static tree::Exp *externalCall(std::string s, tree::ExpList *args) {
+tree::Exp *externalCall(std::string s, tree::ExpList *args) {
   return new tree::CallExp(new tree::NameExp(temp::LabelFactory::NamedLabel(s)),
                            args);
 }
 // 主要进行视角转移
-static tree::Stm *ProcEntryExit1(Frame *frame, tree::Stm *stm) {
+tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
 
   int num = 1;
-  tree::Stm *viewshift = new tree::ExpStm(new T::ConstExp(0));
+  tree::Stm *viewshift = new tree::ExpStm(new tree::ConstExp(0));
   auto get_formals = frame->fromals_;
   auto it_formals = get_formals->begin();
 
-  for (; it_formals != get_formals->end(); it_formals++)
-    if (reg_manager->ArgRegs()->NthTemp(num)->Int)
+  for (; it_formals != get_formals->end(); it_formals++) {
+    if (reg_manager->ArgRegs()->NthTemp(num))
       viewshift = new tree::SeqStm(
           viewshift,
           new tree::MoveStm(
               (*it_formals)
                   ->ToExp(new tree::TempExp(reg_manager->FramePointer())),
               new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num))));
-
-  return new T::SeqStm(viewshift, stm);
+  }
+  return new tree::SeqStm(viewshift, stm);
   /*
     tree::StmList *static_list = frame->view_shift;
     auto get_stm = static_list->GetList();
@@ -93,14 +94,15 @@ static tree::Stm *ProcEntryExit1(Frame *frame, tree::Stm *stm) {
     return bind;
   */
 }
+
 // 在函数结束后说明哪些寄存器仍需要使用
-static assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list) {
+assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list) {
   instr_list->Append(
       new assem::OperInstr("", nullptr, reg_manager->ReturnSink(), nullptr));
   return instr_list;
 }
 // 给函数增加前缀和后缀
-static assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
+assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
 
   static char instr[256];
 

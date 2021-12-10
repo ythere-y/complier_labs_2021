@@ -321,7 +321,7 @@ tr::ExpAndTy *StringExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate StringExp level %s label %s\n", level, label);
 #endif
-  s temp::Label *string_label = temp::LabelFactory::NewLabel();
+  temp::Label *string_label = temp::LabelFactory::NewLabel();
   frags->PushBack(new frame::StringFrag(string_label, str_));
 
   return new tr::ExpAndTy(new tr::ExExp(new tree::NameExp(string_label)),
@@ -916,7 +916,7 @@ tr::ExpAndTy *ArrayExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   inner_list->Append(check_size->exp_->UnEx());
   inner_list->Append(check_init->exp_->UnEx());
   tr::Exp *exp = new tr::ExExp(new tree::CallExp(
-      new tree::NameExp(temp::LabelFactory::NamedLabel("initArray")),
+      new tree::NameExp(temp::LabelFactory::NamedLabel("init_array")),
       inner_list));
   return new tr::ExpAndTy(exp, ty);
 }
@@ -1044,19 +1044,19 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     // 检查body部分的返回值
     if (!entry->ty_->IsSameType(type::VoidTy::Instance()) &&
         (*it_funcs)->result_ == nullptr)
-      errormsg.Error((*it_funcs)->pos_, "procedure returns value");
+      errormsg->Error((*it_funcs)->pos_, "procedure returns value");
     if ((*it_funcs)->result_ &&
         !entry->ty_->IsSameType(tenv->Look((*it_funcs)->result_)->ActualTy()))
-      errormsg.Error((*it_funcs)->pos_, "function return value type incorrect");
+      errormsg->Error((*it_funcs)->pos_,
+                      "function return value type incorrect");
     // 结束层
     venv->EndScope();
-    frame::Frame;
     // 最后一句把结果移动到指定寄存器中
     tree::MoveStm *total_last = new tree::MoveStm(
         new tree::TempExp(reg_manager->ReturnValue()), entry->exp_->UnEx());
     // 在frags中增加内容,增加内容前，要先处理一下shiftview，自动加入一些语句
-    frame::Frag *new_one = new frame::ProcFrag(
-        frame::ProcEntryExit1(funentry->level_->frame_, total_last));
+    frame::Frag *new_one =
+        new frame::ProcFrag(total_last, funentry->level_->frame_);
     frags->PushBack(new_one);
   }
   return TranslateNilExp();
