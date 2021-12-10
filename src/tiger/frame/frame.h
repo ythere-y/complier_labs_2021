@@ -90,6 +90,9 @@ public:
   Frame() {}
   Frame(temp::Label *name, std::vector<bool> *escapes);
 
+  virtual temp::Label *getLabel() = 0;
+  virtual temp::Label *get_name() = 0;
+  virtual std::vector<Access *> *get_formals() = 0;
   virtual Access *allocLocal(bool escape) = 0;
 };
 

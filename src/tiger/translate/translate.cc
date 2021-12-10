@@ -10,7 +10,8 @@
 
 #define test
 #define TEMP temp::LabelFactory
-#define DIFF(type_a, type_b) (typeid(type_a) != typeid(type_b))
+#define DIFF(type_a, type_b) (typeid(*(type_a)) != typeid(type_b))
+#define SAME(type_a, type_b) (typeid(*(type_a)) == typeid(type_b))
 #define LOG(format, args...)                                                   \
   do {                                                                         \
     FILE *debug_log = fopen("tiger.log", "a+");                                \
@@ -39,18 +40,24 @@ Access *Access::AllocLocal(Level *level, bool escape) {
 
 class Cx {
 public:
-  temp::Label **trues_;
-  temp::Label **falses_;
+  std::vector<temp::Label *> *trues_;
+  std::vector<temp::Label *> *falses_;
+  // temp::Label **trues_;
+  // temp::Label **falses_;
   tree::Stm *stm_;
 
-  Cx(temp::Label **trues, temp::Label **falses, tree::Stm *stm)
+  Cx(std::vector<temp::Label *> *trues, std::vector<temp::Label *> *falses,
+     tree::Stm *stm)
       : trues_(trues), falses_(falses), stm_(stm) {}
 };
 
-void fill_label(temp::Label **list, temp::Label *label) {
-  int count = 0;
-  while (list[count])
-    list[count] = label;
+void fill_label(std::vector<temp::Label *> *list, temp::Label *label) {
+  if (list && list->size()) {
+    auto it_list = list->begin();
+    for (; it_list != list->end(); it_list++) {
+      (*it_list) = label;
+    }
+  }
 }
 
 class Exp {
@@ -84,15 +91,14 @@ public:
   }
   [[nodiscard]] Cx UnCx(err::ErrorMsg *errormsg) const override {
     /* TODO: Put your lab5 code here */
-    tree::CjumpStm *cj_stm = new tree::CjumpStm(
-        tree::RelOp::NE_OP, exp_, new tree::ConstExp(0), NULL, NULL);
+
     tree::CjumpStm *stm = new tree::CjumpStm(
         tree::RelOp::NE_OP, exp_, new tree::ConstExp(0), nullptr, nullptr);
 
-    temp::Label **trues = new temp::Label *[1];
-    temp::Label **falses = new temp::Label *[1];
-    trues[0] = stm->true_label_;
-    falses[0] = stm->false_label_;
+    std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
+    std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
+    trues->push_back(stm->true_label_);
+    falses->push_back(stm->false_label_);
     return Cx(trues, falses, stm);
   }
 };
@@ -121,29 +127,63 @@ class CxExp : public Exp {
 public:
   Cx cx_;
 
-  CxExp(temp::Label **trues, temp::Label **falses, tree::Stm *stm)
+  CxExp(std::vector<temp::Label *> *trues, std::vector<temp::Label *> *falses,
+        tree::Stm *stm)
       : cx_(trues, falses, stm) {}
 
   [[nodiscard]] tree::Exp *UnEx() const override {
     /* TODO: Put your lab5 code here */
+
     temp::Temp *r = temp::TempFactory::NewTemp();
     temp::Label *t = temp::LabelFactory::NewLabel();
     temp::Label *f = temp::LabelFactory::NewLabel();
+    fill_label(cx_.trues_, t);
+    fill_label(cx_.falses_, f);
+
+    return new tree::EseqExp(
+        new tree::MoveStm(new tree::TempExp(r), new tree::ConstExp(1)),
+        new tree::EseqExp(
+            cx_.stm_,
+            new tree::EseqExp(
+                new tree::LabelStm(f),
+                new tree::EseqExp(new tree::MoveStm(new tree::TempExp(r),
+                                                    new tree::ConstExp(0)),
+                                  new tree::EseqExp(new tree::LabelStm(t),
+                                                    new tree::TempExp(r))))));
   }
   [[nodiscard]] tree::Stm *UnNx() const override {
     /* TODO: Put your lab5 code here */
+    temp::Label *label = temp::LabelFactory::NewLabel();
+    fill_label(cx_.trues_, label);
+    fill_label(cx_.falses_, label);
+    return new tree::SeqStm(cx_.stm_, new tree::LabelStm(label));
   }
   [[nodiscard]] Cx UnCx(err::ErrorMsg *errormsg) const override {
     /* TODO: Put your lab5 code here */
+    return cx_;
   }
 };
+void clearLog() {
+  // 清空log内容
+  std::ofstream fileout(
+      "tiger.log",
+      std::ios::trunc); // ios::trunc是清除原文件内容,可不写,默认就是它
 
+  fileout.close();
+}
 void ProgTr::Translate() { /* TODO: Put your lab5 code here */
   // 准备生成最外层的frame
   // TODO:最主translate函数
   printf("hello");
-  return;
-  Level *mainframe = new Level();
+  FillBaseVEnv();
+  FillBaseTEnv();
+
+  clearLog();
+
+  // return;
+  Level *mainframe = new Level(
+      new frame::X64Frame(temp::LabelFactory::NamedLabel("tigermain"), nullptr),
+      nullptr);
   temp::Label *mainlabel = temp::LabelFactory::NamedLabel("tigermain");
   // 开始翻译
   ExpAndTy *mainexp = absyn_tree_->Translate(
@@ -191,7 +231,7 @@ tr::ExpAndTy *SimpleVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   type::Ty *ty = type::IntTy::Instance();
   env::EnvEntry *entry = venv->Look(sym_);
 
-  if (!entry || typeid(entry) != typeid(env::VarEntry))
+  if (!entry || DIFF(entry, env::VarEntry))
     errormsg->Error(pos_, "undefined variable %s", sym_->Name().c_str());
 
   env::VarEntry *var_entry = (env::VarEntry *)entry;
@@ -285,11 +325,12 @@ tr::ExpAndTy *VarExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       temp::LabelFactory::LabelString(level->frame_->label_).c_str(),
       temp::LabelFactory::LabelString(label).c_str());
 #endif
-  if (!DIFF(var_, SimpleVar))
+  return var_->Translate(venv, tenv, level, label, errormsg);
+  if (SAME(var_, SimpleVar))
     return ((SimpleVar *)var_)->Translate(venv, tenv, level, label, errormsg);
-  else if (!DIFF(var_, FieldVar))
+  else if (SAME(var_, FieldVar))
     return ((FieldVar *)var_)->Translate(venv, tenv, level, label, errormsg);
-  else if (!DIFF(var_, SubscriptVar))
+  else if (SAME(var_, SubscriptVar))
     return ((SubscriptVar *)var_)
         ->Translate(venv, tenv, level, label, errormsg);
   assert(0);
@@ -340,6 +381,9 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   //先将函数找到
   env::EnvEntry *entry = venv->Look(func_);
+  if (!entry) {
+    LOG("the func it %s and fail to find it\n", func_->Name().c_str());
+  }
   if (!entry || DIFF(entry, env::FunEntry)) {
     errormsg->Error(pos_, "undefined function %s", func_->Name().c_str());
     return new tr::ExpAndTy(exp, ty);
@@ -353,6 +397,7 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tree::ExpList *list = new tree::ExpList();
   auto get_args = args_->GetList();
   auto get_formal = fun_entry->formals_->GetList();
+
   auto it_args = get_args.begin();
   auto it_formal = get_formal.begin();
   for (; it_args != get_args.end() && it_formal != get_formal.end();) {
@@ -377,18 +422,22 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     return new tr::ExpAndTy(exp, ty);
   }
 
-  if (!fun_entry->level_->parent_) {
-    temp::Label *func_name = temp::LabelFactory::NamedLabel(func_->Name());
-    tree::NameExp *name_exp = new tree::NameExp(func_name);
-    exp = new tr::ExExp(new tree::CallExp(name_exp, list));
-
+  if (!fun_entry->level_ || !fun_entry->level_->parent_) {
+    // temp::Label *func_name = temp::LabelFactory::NamedLabel(func_->Name());
+    // tree::NameExp *name_exp = new tree::NameExp(func_name);
+    LOG("got here but level is null so call %s\n", func_->Name().c_str());
+    exp = new tr::ExExp(frame::externalCall(func_->Name(), list));
   } else {
+
+    // exp = new TR::ExExp(new T::CallExp(
+    //     new T::NameExp(func),
+    //     new T::ExpList(StaticLink(fun_entry->level->parent, level), list)));
     tree::Exp *staticlink =
         tr::findStaticLink(fun_entry->level_->parent_, level);
-    exp = new tr::ExExp(new tree::EseqExp(
-        new tree::MoveStm(new tree::TempExp(reg_manager->ReturnValue()),
-                          staticlink),
-        new tree::CallExp(new tree::NameExp(func_), list)));
+    list->Insert(staticlink);
+    tree::CallExp *call_exp = new tree::CallExp(new tree::NameExp(func_), list);
+
+    exp = new tr::ExExp(call_exp);
   }
   return new tr::ExpAndTy(exp, ty);
 }
@@ -414,7 +463,7 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   case Oper::PLUS_OP:
   case Oper::MINUS_OP:
   case Oper::TIMES_OP:
-  case Oper::DIVIDE_OP:
+  case Oper::DIVIDE_OP: {
     if (DIFF(check_left->ty_, type::IntTy))
       errormsg->Error(left_->pos_, "integer required");
     if (DIFF(check_right->ty_, type::IntTy))
@@ -438,11 +487,12 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     exp = new tr::ExExp(new tree::BinopExp(key, check_left->exp_->UnEx(),
                                            check_right->exp_->UnEx()));
     break;
-
+  }
   case Oper::LT_OP:
   case Oper::LE_OP:
   case Oper::GT_OP:
   case Oper::GE_OP:
+  case Oper::NEQ_OP: {
     if (DIFF(check_left->ty_, type::IntTy) &&
         DIFF(check_left->ty_, type::StringTy))
       errormsg->Error(left_->pos_, "integer or string required");
@@ -468,16 +518,41 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     case Oper::GE_OP:
       rel_key = tree::RelOp::GE_OP;
       break;
+    case Oper::NEQ_OP:
+      rel_key = tree::RelOp::NE_OP;
+      break;
     }
 
     stm = new tree::CjumpStm(rel_key, check_left->exp_->UnEx(),
                              check_right->exp_->UnEx(), nullptr, nullptr);
     // TODO:如何不使用patchlist
-    temp::Label **trues = new temp::Label *[1];
-    temp::Label **falses = new temp::Label *[1];
-    trues[0] = stm->true_label_;
-    falses[0] = stm->false_label_;
+    std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
+    std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
+    trues->push_back(stm->true_label_);
+    falses->push_back(stm->false_label_);
     // TODO:有问题
+    exp = new tr::CxExp(trues, falses, stm);
+    break;
+  }
+  case Oper::EQ_OP:
+    tree::CjumpStm *stm;
+    if (SAME(check_left->ty_, type::StringTy)) {
+      tree::ExpList *args = new tree::ExpList();
+      args->Append(check_left->exp_->UnEx());
+      args->Append(check_right->exp_->UnEx());
+      stm = new tree::CjumpStm(tree::EQ_OP,
+                               frame::externalCall("stringEqual", args),
+                               new tree::ConstExp(1), nullptr, nullptr);
+      LOG("got EQ and call string equal\n");
+    } else {
+      LOG("get EQ but into normal\n");
+      stm = new tree::CjumpStm(tree::RelOp::EQ_OP, check_left->exp_->UnEx(),
+                               check_right->exp_->UnEx(), nullptr, nullptr);
+    }
+    std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
+    std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
+    trues->push_back(stm->true_label_);
+    falses->push_back(stm->false_label_);
     exp = new tr::CxExp(trues, falses, stm);
     break;
   }
@@ -764,7 +839,8 @@ tr::ExpAndTy *ForExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   tr::ExpAndTy *check_lo = lo_->Translate(venv, tenv, level, label, errormsg);
   tr::ExpAndTy *check_hi = hi_->Translate(venv, tenv, level, label, errormsg);
-  if (DIFF(check_lo->ty_, type::IntTy) || DIFF(check_hi->ty_, type::IntTy)) {
+  if (DIFF(check_lo->ty_->ActualTy(), type::IntTy) ||
+      DIFF(check_hi->ty_->ActualTy(), type::IntTy)) {
     errormsg->Error(lo_->pos_, "for exp's range type is not integer");
     return new tr::ExpAndTy(exp, ty);
   }
@@ -835,6 +911,7 @@ tr::ExpAndTy *BreakExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate BreakExp level %s label %s\n", level, label);
 #endif
+
   tree::Stm *stm = new tree::JumpStm(new tree::NameExp(label),
                                      new std::vector<temp::Label *>(1, label));
   tr::Exp *exp = new tr::NxExp(stm);
@@ -856,11 +933,18 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   venv->BeginScope();
   tenv->BeginScope();
   tree::Stm *dec = nullptr;
-  auto get_dec = decs_->GetList();
-  // 遍历所有的declaration，生成一个seqstm
-  for (auto it_dec = get_dec.begin(); it_dec != get_dec.end(); it_dec++) {
-    exp = (*it_dec)->Translate(venv, tenv, level, label, errormsg);
-    dec = new tree::SeqStm(dec, exp->UnNx());
+  if (decs_) {
+    auto get_dec = decs_->GetList();
+    if (get_dec.size()) {
+      auto it_dec = get_dec.begin();
+      dec = (*it_dec)->Translate(venv, tenv, level, label, errormsg)->UnNx();
+      it_dec++;
+      // 遍历所有的declaration，生成一个seqstm
+      for (; it_dec != get_dec.end(); it_dec++) {
+        exp = (*it_dec)->Translate(venv, tenv, level, label, errormsg);
+        dec = new tree::SeqStm(dec, exp->UnNx());
+      }
+    }
   }
 
   // 翻译body部分

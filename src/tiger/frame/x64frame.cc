@@ -38,16 +38,18 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
   int formal_offset = reg_manager->WordSize();
 
   int count = 0;
-  for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
-    Access *add_ac;
-    if ((*it_es)) {
-      add_ac = new InFrameAccess(count * formal_offset);
-    } else {
-      add_ac =
-          new InRegAccess(reg_manager->GetRegister(count)); //用一个寄存器来存
+  if (escapes) {
+    for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
+      Access *add_ac;
+      if ((*it_es)) {
+        add_ac = new InFrameAccess(count * formal_offset);
+      } else {
+        add_ac =
+            new InRegAccess(reg_manager->GetRegister(count)); //用一个寄存器来存
+      }
+      fromals_->push_back(add_ac);
+      count++;
     }
-    fromals_->push_back(add_ac);
-    count++;
   }
 }
 
