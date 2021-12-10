@@ -64,22 +64,62 @@ static tree::Exp *externalCall(std::string s, tree::ExpList *args) {
   return new tree::CallExp(new tree::NameExp(temp::LabelFactory::NamedLabel(s)),
                            args);
 }
+// 主要进行视角转移
 static tree::Stm *ProcEntryExit1(Frame *frame, tree::Stm *stm) {
-  tree::StmList *static_list = frame->view_shift;
-  auto get_stm = static_list->GetList();
-  auto it_stm = get_stm.begin();
-  tree::Stm *bind = nullptr;
-  for (; it_stm != get_stm.end(); it_stm++) {
-    bind = new tree::SeqStm((*it_stm), bind);
-  }
-  return bind;
+
+  int num = 1;
+  tree::Stm *viewshift = new tree::ExpStm(new T::ConstExp(0));
+  auto get_formals = frame->fromals_;
+  auto it_formals = get_formals->begin();
+
+  for (; it_formals != get_formals->end(); it_formals++)
+    if (reg_manager->ArgRegs()->NthTemp(num)->Int)
+      viewshift = new tree::SeqStm(
+          viewshift,
+          new tree::MoveStm(
+              (*it_formals)
+                  ->ToExp(new tree::TempExp(reg_manager->FramePointer())),
+              new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num))));
+
+  return new T::SeqStm(viewshift, stm);
+  /*
+    tree::StmList *static_list = frame->view_shift;
+    auto get_stm = static_list->GetList();
+    auto it_stm = get_stm.begin();
+    tree::Stm *bind = nullptr;
+    for (; it_stm != get_stm.end(); it_stm++) {
+      bind = new tree::SeqStm((*it_stm), bind);
+    }
+    return bind;
+  */
 }
+// 在函数结束后说明哪些寄存器仍需要使用
 static assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list) {
   instr_list->Append(
       new assem::OperInstr("", nullptr, reg_manager->ReturnSink(), nullptr));
   return instr_list;
 }
+// 给函数增加前缀和后缀
 static assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
+
+  static char instr[256];
+
+  std::string prolog;
+  sprintf(instr, ".set %s_framesize, %d\n", frame->label_->Name().c_str(),
+          -frame->s_offset_);
+  prolog = std::string(instr);
+  sprintf(instr, "%s:\n", frame->label_->Name().c_str());
+  prolog.append(std::string(instr));
+  sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
+          frame->label_->Name().c_str());
+  prolog.append(std::string(instr));
+
+  sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
+          frame->label_->Name().c_str());
+  std::string epilog = std::string(instr);
+  epilog.append(std::string("\tret\n"));
+  return new assem::Proc(prolog, instr_list, epilog);
+  /*
   std::string prolog = frame->label_->Name();
   prolog.append(std::string(":\n.set"));
   prolog.append(frame->label_->Name());
@@ -93,6 +133,17 @@ static assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
                        "\tpopq %rcx\n"
                        "\tret\n";
   return new assem::Proc(prolog, instr_list, epilog);
+  */
 }
-
+Frame::Frame(temp::Label *name, std::vector<bool> *escapes) {
+  fromals_ = new std::vector<Access *>(0);
+  auto it_esc = escapes->begin();
+  int num = 0;
+  for (; it_esc != escapes->end(); it_esc++)
+    if ((*it_esc)) {
+      fromals_->push_back(new InFrameAccess(reg_manager->WordSize() * num));
+      num++;
+    } else
+      fromals_->push_back(new InRegAccess(temp::TempFactory::NewTemp()));
+}
 } // namespace frame

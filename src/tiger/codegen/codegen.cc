@@ -59,6 +59,7 @@ void AssemInstr::Print(FILE *out, temp::Map *map) const {
 
 namespace tree {
 /* TODO: Put your lab5 code here */
+temp::TempList *L(temp::Temp *inner) { return new temp::TempList(inner); }
 
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
@@ -119,6 +120,18 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
     break;
   case tree::RelOp::GE_OP:
     str = std::string("jge ");
+    break;
+  case tree::RelOp::ULT_OP:
+    str = std::string("jb ");
+    break;
+  case tree::RelOp::ULE_OP:
+    str = std::string("jbe ");
+    break;
+  case tree::RelOp::UGT_OP:
+    str = std::string("jae ");
+    break;
+  case tree::RelOp::UGE_OP:
+    str = std::string("ja ");
     break;
   }
   std::string assem_name =

@@ -140,7 +140,9 @@ public:
 
 void ProgTr::Translate() { /* TODO: Put your lab5 code here */
   // 准备生成最外层的frame
-  // TODO:如何不使用到x64
+  // TODO:最主translate函数
+  printf("hello");
+  return;
   Level *mainframe = new Level();
   temp::Label *mainlabel = temp::LabelFactory::NamedLabel("tigermain");
   // 开始翻译
@@ -319,7 +321,7 @@ tr::ExpAndTy *StringExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate StringExp level %s label %s\n", level, label);
 #endif
-  temp::Label *string_label = temp::LabelFactory::NewLabel();
+  s temp::Label *string_label = temp::LabelFactory::NewLabel();
   frags->PushBack(new frame::StringFrag(string_label, str_));
 
   return new tr::ExpAndTy(new tr::ExExp(new tree::NameExp(string_label)),
@@ -850,27 +852,33 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   type::Ty *ty = type::VoidTy::Instance();
   tree::Exp *res = nullptr;
 
+  // 开始新的一层
   venv->BeginScope();
   tenv->BeginScope();
-  tree::Stm *stm = nullptr;
+  tree::Stm *dec = nullptr;
   auto get_dec = decs_->GetList();
-  // 遍历所有的dec，集成到stm中
+  // 遍历所有的declaration，生成一个seqstm
   for (auto it_dec = get_dec.begin(); it_dec != get_dec.end(); it_dec++) {
     exp = (*it_dec)->Translate(venv, tenv, level, label, errormsg);
-    stm = new tree::SeqStm(stm, exp->UnNx());
+    dec = new tree::SeqStm(dec, exp->UnNx());
   }
 
+  // 翻译body部分
   tr::ExpAndTy *check_body =
       body_->Translate(venv, tenv, level, label, errormsg);
   venv->EndScope();
   tenv->EndScope();
   // TODO:这里删除了一个stm为空的可能
-  res = new tree::EseqExp(stm, check_body->exp_->UnEx());
-  stm = new tree::ExpStm(res);
+  // 将let部分和body部分整合
+  res = new tree::EseqExp(dec, check_body->exp_->UnEx());
+  // 最终整合为一个expstm
+  dec = new tree::ExpStm(res);
   // TODO:这里删除了对main函数的判断
-  frags->PushBack(new frame::ProcFrag(stm, level->frame_));
+  // 放入frags
+  frags->PushBack(new frame::ProcFrag(dec, level->frame_));
   exp = new tr::ExExp(res);
   ty = check_body->ty_->ActualTy();
+
   return new tr::ExpAndTy(exp, ty);
 }
 
@@ -956,6 +964,7 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate FunctionDec level %s label %s\n", level, label);
 #endif
+  // 类型检查用的table
   env::VEnvPtr check_table = new sym::Table<env::EnvEntry>();
 
   auto get_funcs = functions_->GetList();
@@ -968,15 +977,18 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       continue;
     }
     // 获取函数的信息-name-params
+    // 随便加入记录
     check_table->Enter((*it_funcs)->name_, new env::EnvEntry(false));
+    // 获取函数的具体信息
     type::TyList *formal_tys =
         (*it_funcs)->params_->MakeFormalTyList(tenv, errormsg);
     std::vector<bool> *escapes(0);
     // 建立新的Level
     tr::Level *new_level =
         new tr::Level(level, (*it_funcs)->name_, (*it_funcs)->params_);
-
+    // 如果没有范数值，默认为void
     type::Ty *res = type::VoidTy::Instance();
+    // 区分是否有返回值
     if ((*it_funcs)->result_) {
       res = tenv->Look((*it_funcs)->result_);
       if (!res) {
@@ -985,68 +997,68 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       }
     }
     // TODO:这里的类型需要重新审查
+    // 在venv中记录返回值
     venv->Enter(
         (*it_funcs)->name_,
         new env::FunEntry(new_level, (*it_funcs)->name_, formal_tys, res));
   }
+
+  // 第二次遍历函数
   it_funcs = get_funcs.begin();
   for (; it_funcs != get_funcs.end(); it_funcs++) {
-
+    // 开始新层
     venv->BeginScope();
 
-    type::TyList *tylist =
-        (*it_funcs)->params_->MakeFormalTyList(tenv, errormsg);
     FieldList *records = (*it_funcs)->params_;
 
+    // 找出函数类型
     env::FunEntry *funentry = (env::FunEntry *)venv->Look((*it_funcs)->name_);
+    // 得到参数信息
+    type::TyList *tylist =
+        (*it_funcs)->params_->MakeFormalTyList(tenv, errormsg);
 
-    int num = 1;
+    // 得到参数信息
+    type::TyList *formal_typs = funentry->formals_;
+    // 得到参数的获取方式(所有)
+    std::vector<frame::Access *> *formal_accs =
+        funentry->level_->frame_->fromals_;
 
-    tree::SeqStm *parainit = new tree::SeqStm((tree::Stm *)0xf, nullptr);
     auto get_records = records->GetList();
-    auto get_list = tylist->GetList();
+    auto get_formal_types = formal_typs->GetList();
+    //准备遍历每个参数，需要的3个数组信息
+    auto it_formal_types = get_formal_types.begin();
     auto it_records = get_records.begin();
-    auto it_list = get_list.begin();
-
+    auto it_formal_accs = formal_accs->begin();
     for (; it_records != get_records.end();) {
-      tr::Access *tmp_ac = tr::Access::AllocLocal(funentry->level_, true);
-      venv->Enter((*it_records)->name_, new env::VarEntry(tmp_ac, (*it_list)));
-
-      set_params(num, parainit, tmp_ac);
-      num++;
+      venv->Enter(
+          (*it_records)->name_,
+          new env::VarEntry(new tr::Access(funentry->level_, *it_formal_accs),
+                            *it_formal_types));
+      it_formal_accs++;
+      it_formal_types++;
       it_records++;
-      it_list++;
     }
-
+    // 翻译body
     tr::ExpAndTy *entry = (*it_funcs)->body_->Translate(
         venv, tenv, funentry->level_, funentry->label_, errormsg);
-
-    if (DIFF(entry->ty_, type::VoidTy) && (*it_funcs)->result_ == nullptr) {
-      errormsg->Error((*it_funcs)->pos_, "procedure returns value");
-    }
+    // 检查body部分的返回值
+    if (!entry->ty_->IsSameType(type::VoidTy::Instance()) &&
+        (*it_funcs)->result_ == nullptr)
+      errormsg.Error((*it_funcs)->pos_, "procedure returns value");
     if ((*it_funcs)->result_ &&
-        DIFF(entry->ty_, tenv->Look((*it_funcs)->result_)->ActualTy())) {
-
-      // printf("kind1: %d kind2: %d\n", typeid(entry->ty_),
-      //  typeid(tenv->Look((*it_funcs)->result_)));
-      errormsg->Error((*it_funcs)->pos_,
-                      "function return value type incorrect");
-    }
+        !entry->ty_->IsSameType(tenv->Look((*it_funcs)->result_)->ActualTy()))
+      errormsg.Error((*it_funcs)->pos_, "function return value type incorrect");
+    // 结束层
     venv->EndScope();
-
-    tree::Exp *res = entry->exp_->UnEx();
-    tree::Stm *moveResToRV =
-        new tree::MoveStm(new tree::TempExp(reg_manager->ReturnValue()), res);
-    tree::Stm *summary = nullptr;
-    if (num == 2) {
-      parainit->right_ = moveResToRV;
-      summary = parainit;
-    } else if (num > 2)
-      summary = new tree::SeqStm(parainit, moveResToRV);
-
-    frags->PushBack(new frame::ProcFrag(summary, funentry->level_->frame_));
+    frame::Frame;
+    // 最后一句把结果移动到指定寄存器中
+    tree::MoveStm *total_last = new tree::MoveStm(
+        new tree::TempExp(reg_manager->ReturnValue()), entry->exp_->UnEx());
+    // 在frags中增加内容,增加内容前，要先处理一下shiftview，自动加入一些语句
+    frame::Frag *new_one = new frame::ProcFrag(
+        frame::ProcEntryExit1(funentry->level_->frame_, total_last));
+    frags->PushBack(new_one);
   }
-
   return TranslateNilExp();
 }
 

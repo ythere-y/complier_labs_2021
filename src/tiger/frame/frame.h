@@ -80,15 +80,14 @@ class Frame {
   /* TODO: Put your lab5 code here */
 public:
   temp::Label *label_;
-  std::vector<Access *> fromals;
-  std::vector<Access *> locals;
-  unsigned int frame_size;
-  unsigned int max_argnum;
-  tree::StmList *view_shift;
-  int s_offset;
+  std::vector<Access *> *fromals_;
+  std::vector<Access *> *locals_;
+  tree::StmList *viewShift;
+  int s_offset_;
+  int maxArgs = 0;
 
   Frame() {}
-  Frame(temp::Label *name, std::vector<bool> *escapes) {}
+  Frame(temp::Label *name, std::vector<bool> *escapes);
 
   virtual Access *allocLocal(bool escape) = 0;
 };
