@@ -30,15 +30,12 @@ static void restoreCalleeRegs(assem::InstrList &instr_list,
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   CLOG("arrvied\n");
   assem::InstrList instr_list;
-  TAN;
   saveCalleeRegs(instr_list, fs_);
-  TAN;
   auto get_stm = traces_.get()->GetStmList()->GetList();
 
   auto it_stm = get_stm.begin();
 
   for (; it_stm != get_stm.end(); it_stm++) {
-    TAN;
     (*it_stm)->Munch(instr_list, fs_);
   }
   restoreCalleeRegs(instr_list, fs_);
@@ -51,25 +48,14 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
 
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs) {
   saved = new temp::TempList();
-  TAN;
-  if (reg_manager == nullptr)
-    CLOG("null\n");
-  else
-    CLOG("not null\n");
   auto regs = reg_manager->CalleeSaves()->GetList();
-  TAN;
   int len = regs.size();
   for (int i = 0; i < len; i++) {
-    TAN;
     saved->Append(temp::TempFactory::NewTemp());
   }
-  TAN;
   auto it_reg = regs.begin();
-  TAN;
   auto get_saved = saved->GetList();
-  TAN;
   auto it_saved = get_saved.begin();
-  TAN;
   for (; it_reg != regs.end(); it_reg++, it_saved++)
     instr_list.Append(new assem::MoveInstr("movq `s0,`d0",
                                            new temp::TempList((*it_saved)),
