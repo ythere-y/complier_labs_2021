@@ -18,14 +18,14 @@ class X64RegManager : public RegManager {
   /* TODO: Put your lab5 code here */
 private:
   temp::TempList *fast_get(int start, int end) {
-    temp::TempList *res;
+    temp::TempList *res = new temp::TempList();
     for (int i = start; i < end; i++) {
       res->Append(regs_[i]);
     }
     return res;
   }
   temp::TempList *fast_get(int start_1, int end_1, int start_2, int end_2) {
-    temp::TempList *res;
+    temp::TempList *res = new temp::TempList();
     for (int i = start_1; i < end_1; i++) {
       res->Append(regs_[i]);
     }

@@ -43,33 +43,17 @@ Access *Access::AllocLocal(Level *level, bool escape) {
 
 class Cx {
 public:
-  std::vector<temp::Label *> *trues_;
-  std::vector<temp::Label *> *falses_;
+  temp::Label **trues_;
+  temp::Label **falses_;
   // temp::Label **trues_;
   // temp::Label **falses_;
   tree::Stm *stm_;
 
-  Cx(std::vector<temp::Label *> *trues, std::vector<temp::Label *> *falses,
-     tree::Stm *stm)
+  Cx(temp::Label **trues, temp::Label **falses, tree::Stm *stm)
       : trues_(trues), falses_(falses), stm_(stm) {}
 };
 
-void fill_label(std::vector<temp::Label *> *list, temp::Label *label) {
-  if (list && list->size()) {
-    auto it_list = list->begin();
-    for (; it_list != list->end(); it_list++) {
-      (*it_list) = label;
-    }
-    int out_size = 0;
-    out_size = list->size();
-    LOG("fill labels[size = %d]\n", out_size);
-    if ((*list)[0] == nullptr) {
-      LOG("it's still null\n");
-    } else {
-      LOG("it has the value now[name = %s]\n", (*list)[0]->Name().c_str());
-    }
-  }
-}
+void fill_label(temp::Label **list, temp::Label *label) { list[0] = label; }
 
 class Exp {
 public:
@@ -106,10 +90,10 @@ public:
     tree::CjumpStm *stm = new tree::CjumpStm(
         tree::RelOp::NE_OP, exp_, new tree::ConstExp(0), nullptr, nullptr);
 
-    std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
-    std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
-    trues->push_back(stm->true_label_);
-    falses->push_back(stm->false_label_);
+    temp::Label **trues = new temp::Label *[1];
+    temp::Label **falses = new temp::Label *[1];
+    trues[0] = stm->true_label_;
+    falses[0] = stm->false_label_;
     // fill_label(trues,)
     return Cx(trues, falses, stm);
   }
@@ -139,8 +123,7 @@ class CxExp : public Exp {
 public:
   Cx cx_;
 
-  CxExp(std::vector<temp::Label *> *trues, std::vector<temp::Label *> *falses,
-        tree::Stm *stm)
+  CxExp(temp::Label **trues, temp::Label **falses, tree::Stm *stm)
       : cx_(trues, falses, stm) {}
 
   [[nodiscard]] tree::Exp *UnEx() const override {
@@ -538,10 +521,12 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     stm = new tree::CjumpStm(rel_key, check_left->exp_->UnEx(),
                              check_right->exp_->UnEx(), nullptr, nullptr);
     // TODO:如何不使用patchlist
-    std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
-    std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
-    trues->push_back(stm->true_label_);
-    falses->push_back(stm->false_label_);
+    // std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
+    // std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
+    // trues->push_back(stm->true_label_);
+    // falses->push_back(stm->false_label_);
+    temp::Label **trues = &(stm->true_label_);
+    temp::Label **falses = &(stm->false_label_);
     // TODO:有问题
     exp = new tr::CxExp(trues, falses, stm);
     break;
@@ -561,10 +546,12 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       stm = new tree::CjumpStm(tree::RelOp::EQ_OP, check_left->exp_->UnEx(),
                                check_right->exp_->UnEx(), nullptr, nullptr);
     }
-    std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
-    std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
-    trues->push_back(stm->true_label_);
-    falses->push_back(stm->false_label_);
+    // std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
+    // std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
+    // trues->push_back(stm->true_label_);
+    // falses->push_back(stm->false_label_);
+    temp::Label **trues = &(stm->true_label_);
+    temp::Label **falses = &(stm->false_label_);
     exp = new tr::CxExp(trues, falses, stm);
     break;
   }
@@ -725,8 +712,17 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     temp::Label *meeting = temp::LabelFactory::NewLabel();
     tr::fill_label(testc.trues_, true_label);
     tr::fill_label(testc.falses_, false_label);
-
-    exp = new tr::ExExp(new tree::EseqExp(
+    tree::EseqExp *total;
+    TAN;
+    FILE *out = fopen("test.out", "w+");
+    fprintf(out, "hello");
+    fclose(out);
+    out = fopen("test.out", "w+");
+    TAN;
+    testc.stm_->Print(out, 0);
+    fclose(out);
+    TAN;
+    total = new tree::EseqExp(
         testc.stm_,
         new tree::EseqExp(
             new tree::LabelStm(true_label),
@@ -747,7 +743,8 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                     new tree::NameExp(meeting),
                                     new std::vector<temp::Label *>(1, meeting)),
                                 new tree::EseqExp(new tree::LabelStm(meeting),
-                                                  new tree::TempExp(r))))))))));
+                                                  new tree::TempExp(r)))))))));
+    exp = new tr::ExExp(total);
   } else {
     if (DIFF(check_then->ty_, type::VoidTy)) {
       errormsg->Error(pos_, "if-then exp's body must produce no value");
