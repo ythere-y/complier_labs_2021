@@ -29,24 +29,12 @@ static void restoreCalleeRegs(assem::InstrList &instr_list,
 
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   CLOG("arrvied\n");
-  saved = new temp::TempList();
-
-  for (int i = 0; i < 6; i++) {
-    saved->Append(temp::TempFactory::NewTemp());
-  }
   assem::InstrList instr_list;
   TAN;
   saveCalleeRegs(instr_list, fs_);
   TAN;
-  if (traces_.get()->GetStmList())
-    CLOG("not null\n");
-  else
-    CLOG("null\n");
   auto get_stm = traces_.get()->GetStmList()->GetList();
-  if (get_stm.size() == 0) {
-    CLOG("null\n");
-  } else
-    CLOG("not null[size = %d]\n", (get_stm.size()));
+
   auto it_stm = get_stm.begin();
 
   for (; it_stm != get_stm.end(); it_stm++) {
@@ -62,14 +50,42 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
 }
 
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs) {
-  instr_list.Append(
-      new assem::MoveInstr("movq `s0,`d0", saved, reg_manager->CalleeSaves()));
+  saved = new temp::TempList();
+  TAN;
+  if (reg_manager == nullptr)
+    CLOG("null\n");
+  else
+    CLOG("not null\n");
+  auto regs = reg_manager->CalleeSaves()->GetList();
+  TAN;
+  int len = regs.size();
+  for (int i = 0; i < len; i++) {
+    TAN;
+    saved->Append(temp::TempFactory::NewTemp());
+  }
+  TAN;
+  auto it_reg = regs.begin();
+  TAN;
+  auto get_saved = saved->GetList();
+  TAN;
+  auto it_saved = get_saved.begin();
+  TAN;
+  for (; it_reg != regs.end(); it_reg++, it_saved++)
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0",
+                                           new temp::TempList((*it_saved)),
+                                           new temp::TempList((*it_reg))));
 }
 
 static void restoreCalleeRegs(assem::InstrList &instr_list,
                               std::string_view fs) {
-  instr_list.Append(
-      new assem::MoveInstr("movq `s0,`d0", reg_manager->CalleeSaves(), saved));
+  auto regs = reg_manager->CalleeSaves()->GetList();
+  auto get_saved = saved->GetList();
+  auto it_reg = regs.begin();
+  auto it_saved = get_saved.begin();
+  for (; it_reg != regs.end(); it_reg++, it_saved++)
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0",
+                                           new temp::TempList((*it_reg)),
+                                           new temp::TempList((*it_saved))));
 }
 
 void AssemInstr::Print(FILE *out, temp::Map *map) const {
