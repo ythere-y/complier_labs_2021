@@ -320,7 +320,7 @@ type::Ty *IfExp::SemAnalyze(env::VEnvPtr venv, env::TEnvPtr tenv,
       return type::IntTy::Instance();
     }
   } else {
-    if (typeid(then_ty) != typeid(type::VoidTy)) {
+    if (typeid(*then_ty) != typeid(type::VoidTy)) {
       errormsg->Error(pos_, "if-then exp's body must produce no value");
       return type::IntTy::Instance();
     }
@@ -644,4 +644,4 @@ void ProgSem::SemAnalyze() {
   absyn_tree_->SemAnalyze(venv_.get(), tenv_.get(), errormsg_.get());
 }
 
-} // namespace tr
+} // namespace sem
