@@ -10,6 +10,13 @@
 #include "tiger/translate/tree.h"
 
 namespace frame {
+#define FLOG(format, args...)                                                  \
+  do {                                                                         \
+    FILE *debug_log = fopen("tiger.log", "a+");                                \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
 
 class RegManager {
 public:

@@ -10,25 +10,47 @@ namespace {
 constexpr int maxlen = 1024;
 
 } // namespace
+#define TAN CLOG("get here\n")
+#define CLOG(format, args...)                                                  \
+  do {                                                                         \
+    FILE *debug_log = fopen("tiger.log", "a+");                                \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
 
 namespace cg {
 #define SAME(type_a, type_b) typeid(type_a) == typeid(type_b);
 #define IS_PLUS(type) (type)->op_ == tree::BinOp::PLUS_OP;
-static temp::TempList *saved;
+temp::TempList *saved;
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs);
 static void restoreCalleeRegs(assem::InstrList &instr_list,
                               std::string_view fs);
 
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
+  CLOG("arrvied\n");
+  saved = new temp::TempList();
+
   for (int i = 0; i < 6; i++) {
     saved->Append(temp::TempFactory::NewTemp());
   }
   assem::InstrList instr_list;
-
+  TAN;
   saveCalleeRegs(instr_list, fs_);
+  TAN;
+  if (traces_.get()->GetStmList())
+    CLOG("not null\n");
+  else
+    CLOG("null\n");
   auto get_stm = traces_.get()->GetStmList()->GetList();
+  if (get_stm.size() == 0) {
+    CLOG("null\n");
+  } else
+    CLOG("not null[size = %d]\n", (get_stm.size()));
   auto it_stm = get_stm.begin();
+
   for (; it_stm != get_stm.end(); it_stm++) {
+    TAN;
     (*it_stm)->Munch(instr_list, fs_);
   }
   restoreCalleeRegs(instr_list, fs_);

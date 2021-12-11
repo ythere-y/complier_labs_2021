@@ -12,6 +12,9 @@
 #define TEMP temp::LabelFactory
 #define DIFF(type_a, type_b) (typeid(*(type_a)) != typeid(type_b))
 #define SAME(type_a, type_b) (typeid(*(type_a)) == typeid(type_b))
+#define TAN LOG("get here\n");
+#define BENULL LOG("someting null\n");
+#define NONULL LOG("all not null\n");
 #define LOG(format, args...)                                                   \
   do {                                                                         \
     FILE *debug_log = fopen("tiger.log", "a+");                                \
@@ -57,6 +60,14 @@ void fill_label(std::vector<temp::Label *> *list, temp::Label *label) {
     for (; it_list != list->end(); it_list++) {
       (*it_list) = label;
     }
+    int out_size = 0;
+    out_size = list->size();
+    LOG("fill labels[size = %d]\n", out_size);
+    if ((*list)[0] == nullptr) {
+      LOG("it's still null\n");
+    } else {
+      LOG("it has the value now[name = %s]\n", (*list)[0]->Name().c_str());
+    }
   }
 }
 
@@ -99,6 +110,7 @@ public:
     std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
     trues->push_back(stm->true_label_);
     falses->push_back(stm->false_label_);
+    // fill_label(trues,)
     return Cx(trues, falses, stm);
   }
 };
@@ -214,7 +226,9 @@ tr::ExpAndTy *AbsynTree::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                    tr::Level *level, temp::Label *label,
                                    err::ErrorMsg *errormsg) const {
   /* TODO: Put your lab5 code here */
+  LOG("tree started\n");
   root_->Translate(venv, tenv, level, label, errormsg);
+  LOG("tree finished\n");
 }
 
 tr::ExpAndTy *SimpleVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
@@ -223,9 +237,9 @@ tr::ExpAndTy *SimpleVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   /* TODO: Put your lab5 code here */
 
 #ifdef test
-  LOG("Translate SimpleVar level %s label %s\n",
+  LOG("Translate SimpleVar level %s label %s[name = %s]\n",
       temp::LabelFactory::LabelString(level->frame_->label_).c_str(),
-      temp::LabelFactory::LabelString(label).c_str());
+      temp::LabelFactory::LabelString(label).c_str(), sym_->Name().c_str());
 #endif
   tr::Exp *exp = nullptr;
   type::Ty *ty = type::IntTy::Instance();
@@ -397,7 +411,6 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tree::ExpList *list = new tree::ExpList();
   auto get_args = args_->GetList();
   auto get_formal = fun_entry->formals_->GetList();
-
   auto it_args = get_args.begin();
   auto it_formal = get_formal.begin();
   for (; it_args != get_args.end() && it_formal != get_formal.end();) {
@@ -411,6 +424,7 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     it_args++;
     it_formal++;
   }
+  LOG("args over\n");
   if (it_formal != get_formal.end()) {
     errormsg->Error(pos_, "too little params in function %s",
                     this->func_->Name().c_str());
@@ -421,14 +435,11 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                     this->func_->Name().c_str());
     return new tr::ExpAndTy(exp, ty);
   }
-
   if (!fun_entry->level_ || !fun_entry->level_->parent_) {
     // temp::Label *func_name = temp::LabelFactory::NamedLabel(func_->Name());
     // tree::NameExp *name_exp = new tree::NameExp(func_name);
-    LOG("got here but level is null so call %s\n", func_->Name().c_str());
     exp = new tr::ExExp(frame::externalCall(func_->Name(), list));
   } else {
-
     // exp = new TR::ExExp(new T::CallExp(
     //     new T::NameExp(func),
     //     new T::ExpList(StaticLink(fun_entry->level->parent, level), list)));
@@ -439,6 +450,7 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
     exp = new tr::ExExp(call_exp);
   }
+  TAN;
   return new tr::ExpAndTy(exp, ty);
 }
 
@@ -651,7 +663,7 @@ tr::ExpAndTy *SeqExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     check_exp = (*it_seq)->Translate(venv, tenv, level, label, errormsg);
     exp = TranslateSeqExp(exp, check_exp->exp_);
   }
-
+  TAN;
   return new tr::ExpAndTy(exp, check_exp->ty_);
 }
 
@@ -756,6 +768,7 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                          new tree::SeqStm(check_then->exp_->UnNx(),
                                           new tree::LabelStm(false_label)))));
   }
+  LOG("get here\n");
 
   return new tr::ExpAndTy(exp, check_then->ty_);
 }
@@ -930,6 +943,7 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tree::Exp *res = nullptr;
 
   // 开始新的一层
+  LOG("translate the let\n");
   venv->BeginScope();
   tenv->BeginScope();
   tree::Stm *dec = nullptr;
@@ -948,10 +962,12 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   }
 
   // 翻译body部分
+  LOG("translate the body\n");
   tr::ExpAndTy *check_body =
       body_->Translate(venv, tenv, level, label, errormsg);
   venv->EndScope();
   tenv->EndScope();
+  TAN;
   // TODO:这里删除了一个stm为空的可能
   // 将let部分和body部分整合
   res = new tree::EseqExp(dec, check_body->exp_->UnEx());
@@ -959,10 +975,16 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   dec = new tree::ExpStm(res);
   // TODO:这里删除了对main函数的判断
   // 放入frags
+  if (level == nullptr || level->frame_ == nullptr) {
+    BENULL;
+  } else {
+    NONULL;
+  }
   frags->PushBack(new frame::ProcFrag(dec, level->frame_));
+  TAN;
   exp = new tr::ExExp(res);
   ty = check_body->ty_->ActualTy();
-
+  TAN;
   return new tr::ExpAndTy(exp, ty);
 }
 
@@ -1138,11 +1160,13 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     // 最后一句把结果移动到指定寄存器中
     tree::MoveStm *total_last = new tree::MoveStm(
         new tree::TempExp(reg_manager->ReturnValue()), entry->exp_->UnEx());
-    // 在frags中增加内容,增加内容前，要先处理一下shiftview，自动加入一些语句
     frame::Frag *new_one =
         new frame::ProcFrag(total_last, funentry->level_->frame_);
     frags->PushBack(new_one);
   }
+#ifdef test
+  LOG("get here\n");
+#endif
   return TranslateNilExp();
 }
 
@@ -1162,9 +1186,10 @@ tr::Exp *VarDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       errormsg->Error(pos_, "init should not be nil without type specified");
   } else {
     type::Ty *ty = tenv->Look(typ_);
-    if (DIFF(ty->ActualTy(), type::RecordTy))
+    if (SAME(check_init->ty_, type::NilTy) &&
+        DIFF(ty->ActualTy(), type::RecordTy))
       errormsg->Error(pos_, "init should not be nil without type specified");
-    if (ty && ty->IsSameType(check_init->ty_))
+    if (ty && !ty->IsSameType(check_init->ty_))
       errormsg->Error(pos_, "type mismatch");
   }
   access = tr::Access::AllocLocal(level, true);

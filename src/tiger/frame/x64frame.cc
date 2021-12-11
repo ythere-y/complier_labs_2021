@@ -69,32 +69,43 @@ tree::Exp *externalCall(std::string s, tree::ExpList *args) {
 }
 // 主要进行视角转移
 tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
-
+  FLOG("get in\n");
+  /*
   int num = 1;
   tree::Stm *viewshift = new tree::ExpStm(new tree::ConstExp(0));
   auto get_formals = frame->fromals_;
   auto it_formals = get_formals->begin();
+  FLOG("formals [size = %d]", (*get_formals).size());
 
   for (; it_formals != get_formals->end(); it_formals++) {
-    if (reg_manager->ArgRegs()->NthTemp(num))
+
+    if (reg_manager->ArgRegs()->NthTemp(num)) {
+      FLOG("into the if ok \n");
       viewshift = new tree::SeqStm(
           viewshift,
           new tree::MoveStm(
               (*it_formals)
                   ->ToExp(new tree::TempExp(reg_manager->FramePointer())),
               new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num))));
+    }
   }
   return new tree::SeqStm(viewshift, stm);
-  /*
-    tree::StmList *static_list = frame->view_shift;
-    auto get_stm = static_list->GetList();
-    auto it_stm = get_stm.begin();
-    tree::Stm *bind = nullptr;
-    for (; it_stm != get_stm.end(); it_stm++) {
-      bind = new tree::SeqStm((*it_stm), bind);
-    }
-    return bind;
   */
+
+  tree::StmList *static_list = frame->view_shift_;
+  auto get_stm = static_list->GetList();
+  auto it_stm = get_stm.begin();
+  FLOG("static list [size = %d]\n", get_stm.size());
+  tree::Stm *bind = nullptr;
+  for (; it_stm != get_stm.end(); it_stm++) {
+    bind = new tree::SeqStm((*it_stm), bind);
+  }
+  if (bind) {
+    bind = new tree::SeqStm(bind, stm);
+  } else
+    bind = stm;
+
+  return bind;
 }
 
 // 在函数结束后说明哪些寄存器仍需要使用
