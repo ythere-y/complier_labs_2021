@@ -186,8 +186,10 @@ void ProgTr::Translate() { /* TODO: Put your lab5 code here */
 }
 
 tree::Exp *findStaticLink(tr::Level *target, tr::Level *level) {
+
   tree::Exp *staticlink = new tree::TempExp(reg_manager->FramePointer());
   while (level != target) {
+    staticlink = (*(level->frame_->fromals_->begin()))->ToExp(staticlink);
     staticlink = new tree::MemExp(staticlink,
                                   new tree::ConstExp(reg_manager->WordSize()));
     level = level->parent_;
@@ -1034,32 +1036,6 @@ tr::ExpAndTy *VoidExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   return new tr::ExpAndTy(nullptr, type::VoidTy::Instance());
 }
 
-static void set_params(int num, tree::SeqStm *parainit, tr::Access *tmp_ac) {
-  switch (num) {
-  case 1:
-    parainit->left_ = new tree::MoveStm(
-        tmp_ac->access_->ToExp(new tree::TempExp(reg_manager->FramePointer())),
-        new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num)));
-    break;
-  case 2:
-    parainit->right_ = new tree::MoveStm(
-        tmp_ac->access_->ToExp(new tree::TempExp(reg_manager->FramePointer())),
-        new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num)));
-    break;
-  case 3:
-  case 4:
-  case 5:
-  case 6:
-    parainit = new tree::SeqStm(
-        parainit, new tree::MoveStm(
-                      tmp_ac->access_->ToExp(
-                          new tree::TempExp(reg_manager->FramePointer())),
-                      new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num))));
-    break;
-  default:
-    assert(0);
-  }
-}
 tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                 tr::Level *level, temp::Label *label,
                                 err::ErrorMsg *errormsg) const {

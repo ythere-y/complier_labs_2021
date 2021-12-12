@@ -32,7 +32,6 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
   this->fromals_ = new std::vector<Access *>();
   this->locals_ = new std::vector<Access *>();
   this->view_shift_ = new tree::StmList();
-  tree::StmList *view_tail = view_shift_;
   this->s_offset_ = -reg_manager->WordSize();
 
   int formal_offset = reg_manager->WordSize();
@@ -41,6 +40,7 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
   if (escapes) {
     for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
       Access *add_ac;
+      frame_size_ += formal_offset;
       if ((*it_es)) {
         add_ac = new InFrameAccess(count * formal_offset);
       } else {
@@ -95,7 +95,6 @@ tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
   tree::StmList *static_list = frame->view_shift_;
   auto get_stm = static_list->GetList();
   auto it_stm = get_stm.begin();
-  FLOG("static list [size = %d]\n", get_stm.size());
   tree::Stm *bind = nullptr;
   for (; it_stm != get_stm.end(); it_stm++) {
     bind = new tree::SeqStm((*it_stm), bind);
@@ -125,14 +124,16 @@ assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
   prolog = std::string(instr);
   sprintf(instr, "%s:\n", frame->label_->Name().c_str());
   prolog.append(std::string(instr));
-  sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
-          frame->label_->Name().c_str());
+  // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
+  //         frame->label_->Name().c_str());
+  sprintf(instr, "\tsubq $%d , %%rsp\n", frame->frame_size_);
   prolog.append(std::string(instr));
 
-  sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
-          frame->label_->Name().c_str());
+  // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
+  //         frame->label_->Name().c_str());
+  sprintf(instr, "\taddq $%d, %%rsp\n", frame->frame_size_);
   std::string epilog = std::string(instr);
-  epilog.append(std::string("\tret\n"));
+  epilog.append(std::string("\tretq\n"));
   return new assem::Proc(prolog, instr_list, epilog);
   /*
   std::string prolog = frame->label_->Name();
