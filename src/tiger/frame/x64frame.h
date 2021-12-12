@@ -10,7 +10,7 @@
 namespace frame {
 
 static std::string reg_names[] = {
-    "%rax", "%rbx", "rcx",  "%rdx", "%rsi", "%rdi", "%rbp", "%rsp",
+    "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp",
     "%r8",  "%r9",  "%r10", "%r11", "%r12", "%r13", "%r14", "%r15"};
 // "$zero",
 //   "$at",  "$v0",  "$v1",  "$a0",  "$a1",  "$a2",  "$a3",  "$t0",  "$t1",
@@ -67,7 +67,7 @@ public:
    */
   temp::TempList *ArgRegs() {
     /*
-     * rdi, rsi, rdx, rcx, r8, r9
+     * rcx, rdx, rsi, rdi, r8, r9
      */
     int tmp_list[] = {2, 3, 4, 5, 8, 9};
     temp::TempList *res = new temp::TempList();
@@ -87,7 +87,7 @@ public:
   //寄存器。当过程P调用Q时，Q可以覆盖这些寄存器，而不会破坏P所需要的数据。
   temp::TempList *CallerSaves() {
     /*
-     * rax, rdi, rsi, rdx, rcx, r8, r9, r10,r11
+     * rax, rdx, rcx, rsi, rdi, r8, r9, r10,r11
      */
     int tmp_list[] = {0, 2, 3, 4, 5, 8, 9, 10, 11};
     temp::TempList *res = new temp::TempList();

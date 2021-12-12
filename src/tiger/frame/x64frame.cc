@@ -41,12 +41,15 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
     for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
       Access *add_ac;
       frame_size_ += formal_offset;
-      if ((*it_es)) {
-        add_ac = new InFrameAccess(count * formal_offset);
-      } else {
-        add_ac =
-            new InRegAccess(reg_manager->GetRegister(count)); //用一个寄存器来存
-      }
+      // if ((*it_es)) {
+      //   add_ac = new InFrameAccess((count + 1) * formal_offset);
+      // } else {
+      if (count < 6)
+        add_ac = new InRegAccess(
+            reg_manager->ArgRegs()->NthTemp(count)); //用一个寄存器来存
+      else
+        add_ac = new InFrameAccess((count + 1) * formal_offset);
+      // }
       fromals_->push_back(add_ac);
       count++;
     }
@@ -131,9 +134,9 @@ assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
 
   // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\taddq $%d, %%rsp\n", frame->frame_size_);
+  sprintf(instr, "\taddq $%d, %%rsp\n\n", frame->frame_size_);
   std::string epilog = std::string(instr);
-  epilog.append(std::string("\tretq\n"));
+  epilog.append(std::string("\tretq\n\n"));
   return new assem::Proc(prolog, instr_list, epilog);
   /*
   std::string prolog = frame->label_->Name();

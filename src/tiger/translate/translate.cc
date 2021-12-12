@@ -380,9 +380,6 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   //先将函数找到
   env::EnvEntry *entry = venv->Look(func_);
-  if (!entry) {
-    LOG("the func it %s and fail to find it\n", func_->Name().c_str());
-  }
   if (!entry || DIFF(entry, env::FunEntry)) {
     errormsg->Error(pos_, "undefined function %s", func_->Name().c_str());
     return new tr::ExpAndTy(exp, ty);
@@ -435,7 +432,6 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
     exp = new tr::ExExp(call_exp);
   }
-  TAN;
   return new tr::ExpAndTy(exp, ty);
 }
 

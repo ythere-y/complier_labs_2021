@@ -31,19 +31,15 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   CLOG("arrvied\n");
   assem::InstrList *instr_list = (assem_instr_.get()->GetInstrList());
   saveCalleeRegs(*instr_list, fs_);
+
   auto get_stm = traces_.get()->GetStmList()->GetList();
-
   auto it_stm = get_stm.begin();
-
   for (; it_stm != get_stm.end(); it_stm++) {
     (*it_stm)->Munch(*instr_list, fs_);
   }
   restoreCalleeRegs(*instr_list, fs_);
-  // TODO:需要rsp和RV，是啥？
-  temp::TempList *retlist = reg_manager->ReturnSink();
 
-  assem::Targets *jumps = new assem::Targets(nullptr);
-  instr_list->Append(new assem::OperInstr("", nullptr, retlist, jumps));
+  frame::ProcEntryExit2(instr_list);
 }
 
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs) {
@@ -269,7 +265,7 @@ temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   char temp[256];
-  sprintf(temp, "movq $s%d, `d0 ", consti_);
+  sprintf(temp, "movq $%d, `d0 ", consti_);
   temp::Temp *reg = temp::TempFactory::NewTemp();
   temp::TempList *dst = new temp::TempList(reg);
   assem::Targets *jumps = new assem::Targets(nullptr);
@@ -280,7 +276,29 @@ temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  temp::TempList *dst = reg_manager->CalleeSaves();
+  temp::TempList *src = nullptr;
+  assem::Targets *jumps = new assem::Targets(nullptr);
+  // prepare the params
+  temp::TempList *args_list = args_->MunchArgs(instr_list, fs);
+  // call function
+  char assem_name[80];
+  sprintf(assem_name, "call %s",
+          temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
 
+  dst = reg_manager->CallerSaves();
+  src = reg_manager->ArgRegs();
+  instr_list.Append(
+      new assem::OperInstr(std::string(assem_name), dst, src, nullptr));
+
+  temp::Temp *add_one = temp::TempFactory::NewTemp();
+  src = new temp::TempList(reg_manager->ReturnValue());
+  dst = new temp::TempList(add_one);
+
+  instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+  return add_one;
+
+  /*
   temp::TempList *args_list = args_->MunchArgs(instr_list, fs);
   temp::Temp *r = fun_->Munch(instr_list, fs);
   args_list->Append(r);
@@ -289,9 +307,6 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
       "call `s0\n", reg_manager->CalleeSaves(), args_list, nullptr));
   return r;
   // TODO:这里修改较多
-  temp::TempList *dst = reg_manager->CalleeSaves();
-  temp::TempList *src = nullptr;
-  assem::Targets *jumps = new assem::Targets(nullptr);
 
   instr_list.Append(
       new assem::OperInstr(std::string("hello"), dst, nullptr, jumps));
@@ -301,6 +316,7 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   src = new temp::TempList(reg_manager->ReturnValue());
   instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
   return add_one;
+  */
 }
 
 temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
@@ -311,16 +327,41 @@ temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
   temp::TempList *dst = nullptr;
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
+
   auto get_list = GetList();
   auto it_list = get_list.begin();
-  for (int num = 1; it_list != get_list.end(); num++, it_list++) {
+  if (it_list == get_list.end())
+    return res;
+  // 遍历所有参数，每个参数找到一个合适的位置放
+  /* 尝试处理staticlink
+  // src = new temp::TempList((*it_list)->Munch(instr_list, fs));
+  // temp::Temp *first_one = temp::TempFactory::NewTemp();
+  // dst = new temp::TempList(first_one);
+  // instr_list.Append(new assem::OperInstr("movq `s0,`d0", dst, src, jumps));
+  // res->Append(first_one);
+  // it_list++;
+  */
+  for (int num = 0; it_list != get_list.end(); it_list++) {
+
+    // 目前寄存器无限
+    /*
     temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
     src = new temp::TempList(arg);
-    if (reg_manager->GetRegister(num)) {
+    temp::Temp *for_dst = temp::TempFactory::NewTemp();
+    dst = new temp::TempList(for_dst);
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+    */
+
+    temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
+    src = new temp::TempList(arg);
+
+    if (num < 6) {
+      // 从参数寄存器中抽取
       temp::Temp *nth_one = reg_manager->ArgRegs()->NthTemp(num);
       dst = new temp::TempList(nth_one);
       instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
       res->Append(nth_one);
+      num++;
     } else {
       instr_list.Append(new assem::OperInstr("pushq `s0", nullptr, src, jumps));
     }
