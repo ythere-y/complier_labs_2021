@@ -230,6 +230,7 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
     instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
     break;
   }
+  return reg;
 }
 
 temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
@@ -239,6 +240,7 @@ temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   instr_list.Append(
       new assem::OperInstr("movq (`s0),`d0", new temp::TempList(reg),
                            new temp::TempList(r), new assem::Targets(nullptr)));
+  return reg;
 }
 
 temp::Temp *TempExp::Munch(assem::InstrList &instr_list, std::string_view fs) {

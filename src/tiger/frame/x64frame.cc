@@ -54,6 +54,7 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
       count++;
     }
   }
+  FLOG("new Frame here : [frame size = %d]\n", frame_size_);
 }
 
 Access *X64Frame::allocLocal(bool escape) {
