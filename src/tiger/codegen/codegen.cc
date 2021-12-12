@@ -20,8 +20,8 @@ constexpr int maxlen = 1024;
   } while (0)
 
 namespace cg {
-#define SAME(type_a, type_b) typeid(type_a) == typeid(type_b);
-#define IS_PLUS(type) (type)->op_ == tree::BinOp::PLUS_OP;
+#define SAME(type_a, type_b) typeid(*(type_a)) == typeid(type_b)
+#define IS_PLUS(type) (type)->op_ == tree::BinOp::PLUS_OP
 temp::TempList *saved;
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs);
 static void restoreCalleeRegs(assem::InstrList &instr_list,
@@ -29,21 +29,21 @@ static void restoreCalleeRegs(assem::InstrList &instr_list,
 
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   CLOG("arrvied\n");
-  assem::InstrList instr_list;
-  saveCalleeRegs(instr_list, fs_);
+  assem::InstrList *instr_list = (assem_instr_.get()->GetInstrList());
+  saveCalleeRegs(*instr_list, fs_);
   auto get_stm = traces_.get()->GetStmList()->GetList();
 
   auto it_stm = get_stm.begin();
 
   for (; it_stm != get_stm.end(); it_stm++) {
-    (*it_stm)->Munch(instr_list, fs_);
+    (*it_stm)->Munch(*instr_list, fs_);
   }
-  restoreCalleeRegs(instr_list, fs_);
+  restoreCalleeRegs(*instr_list, fs_);
   // TODO:需要rsp和RV，是啥？
   temp::TempList *retlist = reg_manager->ReturnSink();
 
   assem::Targets *jumps = new assem::Targets(nullptr);
-  instr_list.Append(new assem::OperInstr("", nullptr, retlist, jumps));
+  instr_list->Append(new assem::OperInstr("", nullptr, retlist, jumps));
 }
 
 static void saveCalleeRegs(assem::InstrList &instr_list, std::string_view fs) {
@@ -173,11 +173,11 @@ void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
 
-  if (typeid(dst_) == typeid(tree::TempExp)) {
+  if (SAME(dst_, tree::TempExp)) {
     dst = new temp::TempList(dst_->Munch(instr_list, fs));
     src = new temp::TempList(src_->Munch(instr_list, fs));
     instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
-  } else if (typeid(dst_) == typeid(tree::MemExp)) {
+  } else if (SAME(dst_, tree::MemExp)) {
     src = new temp::TempList(dst_->Munch(instr_list, fs));
     src->Append(src_->Munch(instr_list, fs));
 

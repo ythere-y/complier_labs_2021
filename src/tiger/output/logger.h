@@ -18,14 +18,23 @@ public:
   }
   inline void Log(tree::Stm *stm) const {
     stm->Print(out_, 0);
+    // printf("double\n");
+    FILE *my_out = fopen("test_out.out", "w+");
+    stm->Print(my_out, 0);
+    fclose(my_out);
     fprintf(out_, "\n");
   }
-  inline void Log(tree::StmList *stm_list) const { stm_list->Print(out_); }
+  inline void Log(tree::StmList *stm_list) const {
+    // printf("double\n");
+    stm_list->Print(out_);
+  }
   inline void Log(canon::StmListList *stm_lists) const {
+    // printf("double\n");
     for (auto stm_list : stm_lists->GetList())
       stm_list->Print(out_);
   }
   inline void Log(cg::AssemInstr *instr_list, temp::Map *map) const {
+    // printf("double\n");
     instr_list->Print(out_, map);
   }
 

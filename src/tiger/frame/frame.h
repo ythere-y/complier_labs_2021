@@ -97,7 +97,7 @@ public:
   Frame() {}
   Frame(temp::Label *name, std::vector<bool> *escapes);
 
-  virtual temp::Label *getLabel() = 0;
+  virtual temp::Label *GetLabel() = 0;
   virtual temp::Label *get_name() = 0;
   virtual std::vector<Access *> *get_formals() = 0;
   virtual Access *allocLocal(bool escape) = 0;
@@ -169,7 +169,7 @@ class X64Frame : public Frame {
   /* TODO: Put your lab5 code here */
 public:
   X64Frame(){};
-  temp::Label *getLabel() { return label_; }
+  temp::Label *GetLabel() { return label_; }
   X64Frame(temp::Label *name, std::vector<bool> *escapes);
   Access *allocLocal(bool escape);
   temp::Label *get_name() { return this->label_; }

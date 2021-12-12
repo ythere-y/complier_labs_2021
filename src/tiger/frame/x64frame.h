@@ -86,7 +86,11 @@ public:
    * Get return-sink registers
    * @return return-sink registers
    */
-  temp::TempList *ReturnSink() { return fast_get(2, 4); }
+  temp::TempList *ReturnSink() {
+    temp::TempList *res = CalleeSaves();
+    res->Append(ReturnValue());
+    res->Append(StackPointer());
+  }
 
   /**
    * Get word size
