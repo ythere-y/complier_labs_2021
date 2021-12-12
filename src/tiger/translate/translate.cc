@@ -427,7 +427,7 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     //     new T::ExpList(StaticLink(fun_entry->level->parent, level), list)));
     tree::Exp *staticlink =
         tr::findStaticLink(fun_entry->level_->parent_, level);
-    list->Insert(staticlink);
+    // list->Insert(staticlink);
     tree::CallExp *call_exp = new tree::CallExp(new tree::NameExp(func_), list);
 
     exp = new tr::ExExp(call_exp);
@@ -1057,7 +1057,6 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     // 获取函数的具体信息
     type::TyList *formal_tys =
         (*it_funcs)->params_->MakeFormalTyList(tenv, errormsg);
-    std::vector<bool> *escapes(0);
     // 建立新的Level
     tr::Level *new_level =
         new tr::Level(level, (*it_funcs)->name_, (*it_funcs)->params_);

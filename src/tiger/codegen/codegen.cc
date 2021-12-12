@@ -117,8 +117,8 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::Temp *left = left_->Munch(instr_list, fs);
   temp::Temp *right = right_->Munch(instr_list, fs);
 
-  src = new temp::TempList(left);
-  src->Append(right);
+  src = new temp::TempList(right);
+  src->Append(left);
   instr_list.Append(new assem::OperInstr("cmp `s0,`s1", nullptr, src, jumps));
 
   std::string str;

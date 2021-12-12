@@ -68,8 +68,9 @@ public:
   temp::TempList *ArgRegs() {
     /*
      * rcx, rdx, rsi, rdi, r8, r9
+     * rdi, rsi, rdx, rcx, r8, r9
      */
-    int tmp_list[] = {2, 3, 4, 5, 8, 9};
+    int tmp_list[] = {5, 4, 3, 2, 8, 9};
     temp::TempList *res = new temp::TempList();
 
     for (int i = 0; i < 6; i++) {
