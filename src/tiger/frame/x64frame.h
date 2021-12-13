@@ -127,6 +127,7 @@ public:
     res->Append(ReturnValue());
     res->Append(StackPointer());
   }
+  temp::Temp *RDX() { return regs_[3]; }
 
   /**
    * Get word size

@@ -57,6 +57,11 @@ public:
    * @return return-sink registers
    */
   [[nodiscard]] virtual temp::TempList *ReturnSink() = 0;
+  /**
+   * Get rdx registers
+   * @return rdx registers
+   */
+  [[nodiscard]] virtual temp::Temp *RDX() = 0;
 
   /**
    * Get word size
@@ -90,7 +95,7 @@ public:
   std::vector<Access *> *fromals_;
   std::vector<Access *> *locals_;
   tree::StmList *view_shift_;
-  int frame_size_;
+  int frame_num_;
   int s_offset_;
   int maxArgs = 0;
 

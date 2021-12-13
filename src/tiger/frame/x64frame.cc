@@ -28,45 +28,69 @@ public:
 /* TODO: Put your lab5 code here */
 
 X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
+  int word_size = reg_manager->WordSize();
+
   this->label_ = name;
   this->fromals_ = new std::vector<Access *>();
   this->locals_ = new std::vector<Access *>();
   this->view_shift_ = new tree::StmList();
   this->s_offset_ = -reg_manager->WordSize();
-
-  int formal_offset = reg_manager->WordSize();
+  this->s_offset_ = -word_size;
+  this->frame_num_ = 0;
 
   int count = 0;
+  int formal_offset = word_size;
+
   if (escapes) {
     for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
       Access *add_ac;
-      frame_size_ += formal_offset;
-      // if ((*it_es)) {
-      //   add_ac = new InFrameAccess((count + 1) * formal_offset);
-      // } else {
-      if (count < 6)
-        add_ac = new InRegAccess(
-            reg_manager->ArgRegs()->NthTemp(count)); //用一个寄存器来存
-      else
-        add_ac = new InFrameAccess((count + 1) * formal_offset);
-      // }
+      // 需要存frame中
+      if (*it_es) {
+        if (count < 6) {
+          // 确定在frame中的位置
+          add_ac = new InFrameAccess(s_offset_);
+          // 增加一手将这个位置的东西移过来的操作
+          view_shift_->Append(new tree::MoveStm(
+              new tree::MemExp(new tree::ConstExp(s_offset_),
+                               new tree::TempExp(reg_manager->FramePointer())),
+              new tree::TempExp(reg_manager->ArgRegs()->NthTemp(count))));
+
+          s_offset_ -= word_size;
+        } else {
+          add_ac = new InFrameAccess(s_offset_);
+          s_offset_ -= word_size;
+        }
+      } else {
+        temp::Temp *reg = temp::TempFactory::NewTemp();
+        if (count < 6) {
+          // 增加一手从args的地方拿来参数的操作
+          view_shift_->Append(new tree::MoveStm(
+              new tree::TempExp(reg),
+              new tree::TempExp(reg_manager->ArgRegs()->NthTemp(count))));
+
+        } else {
+          printf("Frame : args more than 6.\n");
+        }
+        add_ac = new InRegAccess(reg);
+      }
+
       fromals_->push_back(add_ac);
       count++;
     }
   }
-  FLOG("new Frame here : [frame size = %d]\n", frame_size_);
 }
-
 Access *X64Frame::allocLocal(bool escape) {
-  if (escape) {
-    frame_size_++;
-    return new InFrameAccess(-reg_manager->WordSize() * (this->frame_size_));
-  } else {
-    return new InRegAccess(
-        reg_manager->GetRegister(frame_size_)); //创造一个新的
-  }
-}
 
+  Access *local;
+  if (escape) {
+    local = new InFrameAccess(-s_offset_);
+    s_offset_ += reg_manager->WordSize();
+  } else {
+    // if(args_num )
+    local = new InRegAccess(temp::TempFactory::NewTemp());
+  }
+  return local;
+}
 tree::Exp *externalCall(std::string s, tree::ExpList *args) {
   return new tree::CallExp(new tree::NameExp(temp::LabelFactory::NamedLabel(s)),
                            args);
@@ -74,27 +98,6 @@ tree::Exp *externalCall(std::string s, tree::ExpList *args) {
 // 主要进行视角转移
 tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
   FLOG("get in\n");
-  /*
-  int num = 1;
-  tree::Stm *viewshift = new tree::ExpStm(new tree::ConstExp(0));
-  auto get_formals = frame->fromals_;
-  auto it_formals = get_formals->begin();
-  FLOG("formals [size = %d]", (*get_formals).size());
-
-  for (; it_formals != get_formals->end(); it_formals++) {
-
-    if (reg_manager->ArgRegs()->NthTemp(num)) {
-      FLOG("into the if ok \n");
-      viewshift = new tree::SeqStm(
-          viewshift,
-          new tree::MoveStm(
-              (*it_formals)
-                  ->ToExp(new tree::TempExp(reg_manager->FramePointer())),
-              new tree::TempExp(reg_manager->ArgRegs()->NthTemp(num))));
-    }
-  }
-  return new tree::SeqStm(viewshift, stm);
-  */
 
   tree::StmList *static_list = frame->view_shift_;
   auto get_stm = static_list->GetList();
@@ -130,12 +133,12 @@ assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
   prolog.append(std::string(instr));
   // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\tsubq $%d , %%rsp\n", frame->frame_size_);
+  sprintf(instr, "\tsubq $%d , %%rsp\n", -frame->s_offset_);
   prolog.append(std::string(instr));
 
   // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\taddq $%d, %%rsp\n\n", frame->frame_size_);
+  sprintf(instr, "\taddq $%d, %%rsp\n\n", -frame->s_offset_);
   std::string epilog = std::string(instr);
   epilog.append(std::string("\tretq\n\n"));
   return new assem::Proc(prolog, instr_list, epilog);

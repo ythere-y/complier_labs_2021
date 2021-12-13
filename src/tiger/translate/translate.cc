@@ -191,7 +191,7 @@ tree::Exp *findStaticLink(tr::Level *target, tr::Level *level) {
   while (level != target) {
     staticlink = (*(level->frame_->fromals_->begin()))->ToExp(staticlink);
     staticlink = new tree::MemExp(staticlink,
-                                  new tree::ConstExp(reg_manager->WordSize()));
+                                  new tree::ConstExp(-reg_manager->WordSize()));
     level = level->parent_;
   }
   return staticlink;

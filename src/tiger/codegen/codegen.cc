@@ -80,6 +80,23 @@ void AssemInstr::Print(FILE *out, temp::Map *map) const {
 namespace tree {
 /* TODO: Put your lab5 code here */
 temp::TempList *L(temp::Temp *inner) { return new temp::TempList(inner); }
+temp::TempList *L(temp::Temp *one, temp::Temp *two) {
+  temp::TempList *res = L(one);
+  res->Append(two);
+  return res;
+}
+void PUSH(temp::Temp *src, assem::InstrList &instr_list, std::string_view fs) {
+  instr_list.Append(new assem::OperInstr(
+      "subq $8,`d0", L(reg_manager->StackPointer()), nullptr, nullptr));
+  instr_list.Append(new assem::MoveInstr(
+      "movq `s0,(`d0)", L(reg_manager->StackPointer()), L(src)));
+}
+void POP(temp::Temp *src, assem::InstrList &instr_list, std::string_view fs) {
+  instr_list.Append(new assem::MoveInstr("movq (`s0),`d0", L(src),
+                                         L(reg_manager->StackPointer())));
+  instr_list.Append(new assem::OperInstr(
+      "addq $8,`d0", L(reg_manager->StackPointer()), nullptr, nullptr));
+}
 
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
@@ -118,8 +135,8 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::Temp *right = right_->Munch(instr_list, fs);
 
   src = new temp::TempList(right);
-  src->Append(left);
-  instr_list.Append(new assem::OperInstr("cmp `s0,`s1", nullptr, src, jumps));
+  dst = L(left);
+  instr_list.Append(new assem::OperInstr("cmp `d0,`s1", dst, src, jumps));
 
   std::string str;
   switch (op_) {
@@ -154,6 +171,7 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
     str = std::string("ja ");
     break;
   }
+
   std::string assem_name =
       str.append(temp::LabelFactory::LabelString(true_label_));
   std::vector<temp::Label *> *tmp_labels =
@@ -174,11 +192,11 @@ void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
     src = new temp::TempList(src_->Munch(instr_list, fs));
     instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
   } else if (SAME(dst_, tree::MemExp)) {
-    src = new temp::TempList(dst_->Munch(instr_list, fs));
-    src->Append(src_->Munch(instr_list, fs));
 
-    instr_list.Append(
-        new assem::OperInstr("movq `s0,(`s1)", nullptr, src, jumps));
+    dst = L(((tree::MemExp *)dst_)->exp_->Munch(instr_list, fs));
+    src = L(src_->Munch(instr_list, fs));
+
+    instr_list.Append(new assem::OperInstr("movq `s0,(`d0)", dst, src, jumps));
   } else {
     printf("Wrong tree::MoveStm.");
   }
@@ -193,42 +211,54 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   temp::Temp *left = left_->Munch(instr_list, fs);
   temp::Temp *right = right_->Munch(instr_list, fs);
-  instr_list.Append(new assem::MoveInstr(
-      "movq `s0,d0", new temp::TempList(reg_manager->ReturnValue()),
-      new temp::TempList(left)));
   temp::Temp *reg = temp::TempFactory::NewTemp();
   temp::TempList *dst;
   temp::TempList *src;
   assem::Targets *jumps = new assem::Targets(nullptr);
-  dst = new temp::TempList(reg);
-  src = new temp::TempList(right);
-  src->Append(reg);
 
+  src = L(reg);
+  src->Append(right);
   switch (op_) {
+
   case tree::PLUS_OP:
-    instr_list.Append(new assem::OperInstr("addq `s0,`d0", dst, src, jumps));
-    break;
   case tree::MINUS_OP:
-    instr_list.Append(new assem::OperInstr("subq `s0,`d0", dst, src, jumps));
-  case tree::MUL_OP:
-    instr_list.Append(new assem::OperInstr("imulq `s0,`d0", dst, src, jumps));
+  case tree::MUL_OP: {
+    dst = new temp::TempList(reg);
+    src = new temp::TempList(left);
+    // 将左边的数字先移动到结果寄存器
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+    src = L(right);
+    switch (op_) {
+    case tree::PLUS_OP:
+      instr_list.Append(new assem::OperInstr("addq `s0,`d0", dst, src, jumps));
+      break;
+    case tree::MINUS_OP:
+      instr_list.Append(new assem::OperInstr("subq `s0,`d0", dst, src, jumps));
+      break;
+    case tree::MUL_OP:
+      instr_list.Append(new assem::OperInstr("imulq `s0,`d0", dst, src, jumps));
+      break;
+    }
     break;
-  case tree::DIV_OP:
+  }
 
-    instr_list.Append(new assem::OperInstr(
-        "cltd", reg_manager->ReturnSink(),
-        new temp::TempList(reg_manager->ReturnValue()), jumps));
-
-    auto get_return_sink = reg_manager->ReturnSink()->GetList();
-    for (auto it_return_sink = get_return_sink.begin();
-         it_return_sink != get_return_sink.end(); it_return_sink++)
-      src->Append((*it_return_sink));
-
-    dst = reg_manager->ReturnSink();
+  case tree::DIV_OP: {
+    // 被除数放到rax中
+    instr_list.Append(new assem::MoveInstr(
+        "movq `s0,`d0", L(reg_manager->ReturnValue()), L(left)));
+    PUSH(reg_manager->RDX(), instr_list, fs);
+    //对rax进行拓展，放到rdx中
+    instr_list.Append(new assem::OperInstr("cqto", nullptr, nullptr, nullptr));
+    src = L(right);
+    // 除数作为参数操作数放入
     instr_list.Append(new assem::OperInstr("idivq `s0", dst, src, jumps));
-    src = new temp::TempList(reg_manager->ReturnValue());
+    POP(reg_manager->RDX(), instr_list, fs);
+    src = L(reg_manager->ReturnValue());
+    dst = L(reg);
+    // 将结果从rax中移到reg
     instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
     break;
+  }
   }
   return reg;
 }
@@ -238,8 +268,7 @@ temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::Temp *r = exp_->Munch(instr_list, fs);
   temp::Temp *reg = temp::TempFactory::NewTemp();
   instr_list.Append(
-      new assem::OperInstr("movq (`s0),`d0", new temp::TempList(reg),
-                           new temp::TempList(r), new assem::Targets(nullptr)));
+      new assem::OperInstr("movq (`s0),`d0", L(reg), L(r), nullptr));
   return reg;
 }
 
@@ -259,8 +288,7 @@ temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   char temp[256];
   sprintf(temp, "\tleaq %s(%%rip), `d0 ", (name_->Name().c_str()));
   temp::Temp *reg = temp::TempFactory::NewTemp();
-  instr_list.Append(new assem::MoveInstr(std::string(temp),
-                                         new temp::TempList(reg), nullptr));
+  instr_list.Append(new assem::MoveInstr(std::string(temp), L(reg), nullptr));
   return reg;
 }
 
@@ -269,10 +297,9 @@ temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   char temp[256];
   sprintf(temp, "movq $%d, `d0 ", consti_);
   temp::Temp *reg = temp::TempFactory::NewTemp();
-  temp::TempList *dst = new temp::TempList(reg);
-  assem::Targets *jumps = new assem::Targets(nullptr);
+  temp::TempList *dst = L(reg);
   instr_list.Append(
-      new assem::OperInstr(std::string(temp), dst, nullptr, jumps));
+      new assem::OperInstr(std::string(temp), dst, nullptr, nullptr));
   return reg;
 }
 
@@ -294,8 +321,8 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
       new assem::OperInstr(std::string(assem_name), dst, src, nullptr));
 
   temp::Temp *add_one = temp::TempFactory::NewTemp();
-  src = new temp::TempList(reg_manager->ReturnValue());
-  dst = new temp::TempList(add_one);
+  src = L(reg_manager->ReturnValue());
+  dst = L(add_one);
 
   instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
   return add_one;
@@ -335,37 +362,21 @@ temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
   if (it_list == get_list.end())
     return res;
   // 遍历所有参数，每个参数找到一个合适的位置放
-  /* 尝试处理staticlink
-  // src = new temp::TempList((*it_list)->Munch(instr_list, fs));
-  // temp::Temp *first_one = temp::TempFactory::NewTemp();
-  // dst = new temp::TempList(first_one);
-  // instr_list.Append(new assem::OperInstr("movq `s0,`d0", dst, src, jumps));
-  // res->Append(first_one);
-  // it_list++;
-  */
+
   for (int num = 0; it_list != get_list.end(); it_list++) {
-
-    // 目前寄存器无限
-    /*
-    temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
-    src = new temp::TempList(arg);
-    temp::Temp *for_dst = temp::TempFactory::NewTemp();
-    dst = new temp::TempList(for_dst);
-    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
-    */
-
     temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
     src = new temp::TempList(arg);
 
     if (num < 6) {
       // 从参数寄存器中抽取
+      assert(num < 6 && num >= 0);
       temp::Temp *nth_one = reg_manager->ArgRegs()->NthTemp(num);
       dst = new temp::TempList(nth_one);
       instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
       res->Append(nth_one);
       num++;
     } else {
-      instr_list.Append(new assem::OperInstr("pushq `s0", nullptr, src, jumps));
+      PUSH(arg, instr_list, fs);
     }
   }
   return res;
