@@ -83,10 +83,8 @@ public:
     tree::CjumpStm *stm = new tree::CjumpStm(
         tree::RelOp::NE_OP, exp_, new tree::ConstExp(0), nullptr, nullptr);
 
-    temp::Label **trues = new temp::Label *[1];
-    temp::Label **falses = new temp::Label *[1];
-    trues[0] = stm->true_label_;
-    falses[0] = stm->false_label_;
+    temp::Label **trues = &(stm->true_label_);
+    temp::Label **falses = &(stm->false_label_);
     // fill_label(trues,)
     return Cx(trues, falses, stm);
   }

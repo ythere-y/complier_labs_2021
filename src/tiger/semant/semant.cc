@@ -286,7 +286,7 @@ type::Ty *AssignExp::SemAnalyze(env::VEnvPtr venv, env::TEnvPtr tenv,
     env::EnvEntry *entry = venv->Look(static_cast<SimpleVar *>(var_)->sym_);
     if (entry && entry->readonly_) {
       errormsg->Error(pos_, "loop variable can't be assigned");
-      return type::IntTy::Instance();
+      return type::VoidTy::Instance();
     }
   }
 
@@ -294,7 +294,7 @@ type::Ty *AssignExp::SemAnalyze(env::VEnvPtr venv, env::TEnvPtr tenv,
   type::Ty *exp_ty = exp_->SemAnalyze(venv, tenv, labelcount, errormsg);
   if (!var_ty->IsSameType(exp_ty))
     errormsg->Error(pos_, "unmatched assign exp");
-  return var_ty;
+  return type::VoidTy::Instance();
 }
 
 type::Ty *IfExp::SemAnalyze(env::VEnvPtr venv, env::TEnvPtr tenv,
@@ -313,11 +313,11 @@ type::Ty *IfExp::SemAnalyze(env::VEnvPtr venv, env::TEnvPtr tenv,
   type::Ty *then_ty = then_->SemAnalyze(venv, tenv, labelcount, errormsg);
   if (elsee_ != nullptr) {
     type::Ty *else_ty = elsee_->SemAnalyze(venv, tenv, labelcount, errormsg);
-    if (then_ty->IsSameType(else_ty)) {
+    if (then_ty->ActualTy()->IsSameType(else_ty->ActualTy())) {
       return then_ty;
     } else {
       errormsg->Error(pos_, "then exp and else exp type mismatch");
-      return type::IntTy::Instance();
+      return type::VoidTy::Instance();
     }
   } else {
     if (typeid(*then_ty) != typeid(type::VoidTy)) {
