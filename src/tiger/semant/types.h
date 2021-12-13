@@ -103,6 +103,7 @@ public:
 
   std::list<Field *> &GetList() { return field_list_; }
   void Append(Field *field) { field_list_.push_back(field); }
+  int GetSize() { return field_list_.size(); }
 
 private:
   std::list<Field *> field_list_;

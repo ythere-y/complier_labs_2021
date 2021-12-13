@@ -15,13 +15,6 @@
 #define TAN LOG("get here\n");
 #define BENULL LOG("someting null\n");
 #define NONULL LOG("all not null\n");
-#define LOG(format, args...)                                                   \
-  do {                                                                         \
-    FILE *debug_log = fopen("tiger.log", "a+");                                \
-    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
-    fprintf(debug_log, format, ##args);                                        \
-    fclose(debug_log);                                                         \
-  } while (0)
 
 #define COMMANLOG(format, level, label, args...)                               \
   do {                                                                         \
@@ -151,7 +144,9 @@ public:
     temp::Label *label = temp::LabelFactory::NewLabel();
     fill_label(cx_.trues_, label);
     fill_label(cx_.falses_, label);
+    TAN;
     return new tree::SeqStm(cx_.stm_, new tree::LabelStm(label));
+    TAN;
   }
   [[nodiscard]] Cx UnCx(err::ErrorMsg *errormsg) const override {
     /* TODO: Put your lab5 code here */
@@ -169,7 +164,6 @@ void clearLog() {
 void ProgTr::Translate() { /* TODO: Put your lab5 code here */
   // 准备生成最外层的frame
   // TODO:最主translate函数
-  printf("hello");
   FillBaseVEnv();
   FillBaseTEnv();
 
@@ -183,15 +177,22 @@ void ProgTr::Translate() { /* TODO: Put your lab5 code here */
   // 开始翻译
   ExpAndTy *mainexp = absyn_tree_->Translate(
       venv_.get(), tenv_.get(), mainframe, mainlabel, errormsg_.get());
+
+  LOG("translate finished ~~\n");
 }
 
 tree::Exp *findStaticLink(tr::Level *target, tr::Level *level) {
-
+  LOG("find staticlink[frame _ size = %d]\n", level->frame_->s_offset_);
+  tree::Exp *get_rsp = new tree::TempExp(reg_manager->StackPointer());
   tree::Exp *staticlink = new tree::TempExp(reg_manager->FramePointer());
+  // 取出rsp减去一个frame_size的大小
   while (level != target) {
+    LOG("not equal\n");
+    // 取到上一个frame的值，跳到上面去
     staticlink = (*(level->frame_->fromals_->begin()))->ToExp(staticlink);
-    staticlink = new tree::MemExp(staticlink,
-                                  new tree::ConstExp(-reg_manager->WordSize()));
+    // staticlink = new tree::MemExp(new
+    // tree::ConstExp(-reg_manager->WordSize()),
+    //                               staticlink);
     level = level->parent_;
   }
   return staticlink;
@@ -212,7 +213,7 @@ tr::ExpAndTy *AbsynTree::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                    err::ErrorMsg *errormsg) const {
   /* TODO: Put your lab5 code here */
   LOG("tree started\n");
-  root_->Translate(venv, tenv, level, label, errormsg);
+  return root_->Translate(venv, tenv, level, label, errormsg);
   LOG("tree finished\n");
 }
 
@@ -253,7 +254,7 @@ tr::ExpAndTy *FieldVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   type::Ty *real_ty = check_var->ty_->ActualTy();
   tr::Exp *exp = nullptr;
   type::Ty *ty = type::IntTy::Instance();
-  if (typeid(real_ty) != typeid(type::RecordTy)) {
+  if (DIFF(real_ty, type::RecordTy)) {
     errormsg->Error(pos_, "not a record type");
     return new tr::ExpAndTy(nullptr, type::IntTy::Instance());
   } else {
@@ -262,19 +263,19 @@ tr::ExpAndTy *FieldVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     auto get_fi = fields->GetList();
     for (auto it_fi = get_fi.begin(); it_fi != get_fi.end(); it_fi++) {
       if ((*it_fi)->name_ == sym_) {
-        if (typeid(check_var->exp_) != typeid(tr::ExExp)) {
+        if (DIFF(check_var->exp_, tr::ExExp)) {
           errormsg->Error(pos_, "Error: fieldVar's loc must be a expression");
         }
         check_var->exp_->UnEx();
-        tr::Exp *exp = new tr::ExExp(new tree::MemExp(
+        exp = new tr::ExExp(new tree::MemExp(
             check_var->exp_->UnEx(),
             new tree::ConstExp(order * reg_manager->WordSize())));
         type::Ty *ty = (*it_fi)->ty_->ActualTy();
         break;
       }
+      order++;
     }
   }
-  errormsg->Error(pos_, "field %s doesn't exist", sym_->Name().c_str());
   return new tr::ExpAndTy(exp, ty);
 }
 
@@ -325,14 +326,6 @@ tr::ExpAndTy *VarExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       temp::LabelFactory::LabelString(label).c_str());
 #endif
   return var_->Translate(venv, tenv, level, label, errormsg);
-  if (SAME(var_, SimpleVar))
-    return ((SimpleVar *)var_)->Translate(venv, tenv, level, label, errormsg);
-  else if (SAME(var_, FieldVar))
-    return ((FieldVar *)var_)->Translate(venv, tenv, level, label, errormsg);
-  else if (SAME(var_, SubscriptVar))
-    return ((SubscriptVar *)var_)
-        ->Translate(venv, tenv, level, label, errormsg);
-  assert(0);
 }
 
 tr::ExpAndTy *NilExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
@@ -389,7 +382,7 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   ty = fun_entry->result_;
   if (!ty)
     ty = type::VoidTy::Instance();
-
+  TAN;
   tree::ExpList *list = new tree::ExpList();
   auto get_args = args_->GetList();
   auto get_formal = fun_entry->formals_->GetList();
@@ -398,7 +391,9 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   for (; it_args != get_args.end() && it_formal != get_formal.end();) {
     tr::ExpAndTy *check_arg =
         (*it_args)->Translate(venv, tenv, level, label, errormsg);
+    TAN;
     if (!check_arg->ty_->IsSameType((*it_formal))) {
+      TAN;
       errormsg->Error(pos_, "para type mismatch");
       return new tr::ExpAndTy(exp, ty);
     }
@@ -427,7 +422,8 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     //     new T::ExpList(StaticLink(fun_entry->level->parent, level), list)));
     tree::Exp *staticlink =
         tr::findStaticLink(fun_entry->level_->parent_, level);
-    // list->Insert(staticlink);
+    list->Insert(staticlink);
+    // LOG("call  [size = %d]\n", list->GetList().size());
     tree::CallExp *call_exp = new tree::CallExp(new tree::NameExp(func_), list);
 
     exp = new tr::ExExp(call_exp);
@@ -563,7 +559,7 @@ tr::ExpAndTy *RecordExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate RecordExp level %s label %s\n", level, label);
 #endif
-  type::Ty *ty = tenv->Look(typ_);
+  type::NameTy *ty = (type::NameTy *)tenv->Look(typ_);
   tr::ExExp *exp = NULL;
   tree::ExpList *list = new tree::ExpList();
 
@@ -572,13 +568,7 @@ tr::ExpAndTy *RecordExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     return new tr::ExpAndTy(exp, type::IntTy::Instance());
   }
 
-  ty = ty->ActualTy();
-  if (DIFF(ty, type::RecordTy)) {
-    errormsg->Error(pos_, "not record type %s", typ_->Name().c_str());
-    return new tr::ExpAndTy(exp, ty);
-  }
-
-  auto get_re = ((type::RecordTy *)ty)->fields_->GetList();
+  auto get_re = ((type::RecordTy *)ty->ty_)->fields_->GetList();
   auto get_ef = fields_->GetList();
   auto it_re = get_re.begin();
   auto it_ef = get_ef.begin();
@@ -603,7 +593,7 @@ tr::ExpAndTy *RecordExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   //     inner_list);
 
   tree::Stm *stm = new tree::MoveStm(new tree::TempExp(reg),
-                                     frame::externalCall("allocRecord", list));
+                                     frame::externalCall("alloc_record", list));
 
   count = 0;
   auto get_list = list->GetList();
@@ -613,7 +603,9 @@ tr::ExpAndTy *RecordExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
         new tree::MemExp(new tree::TempExp(reg),
                          new tree::ConstExp(count * reg_manager->WordSize()));
     tree::MoveStm *add_one = new tree::MoveStm(from, (*it_list));
+    TAN;
     stm = new tree::SeqStm(stm, add_one);
+    TAN;
     count++;
   }
 
@@ -648,7 +640,6 @@ tr::ExpAndTy *SeqExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     check_exp = (*it_seq)->Translate(venv, tenv, level, label, errormsg);
     exp = TranslateSeqExp(exp, check_exp->exp_);
   }
-  TAN;
   return new tr::ExpAndTy(exp, check_exp->ty_);
 }
 
@@ -698,7 +689,7 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   if (elsee_) {
     tr::ExpAndTy *check_elsee =
         elsee_->Translate(venv, tenv, level, label, errormsg);
-    if (!check_then->ty_->IsSameType(check_elsee->ty_)) {
+    if (!check_then->ty_->IsSameType(check_elsee->ty_->ActualTy())) {
       errormsg->Error(pos_, "then exp and else exp type mismatch");
       return new tr::ExpAndTy(nullptr, type::VoidTy::Instance());
     }
@@ -711,15 +702,7 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     tr::fill_label(testc.trues_, true_label);
     tr::fill_label(testc.falses_, false_label);
     tree::EseqExp *total;
-    TAN;
-    FILE *out = fopen("test.out", "w+");
-    fprintf(out, "hello");
-    fclose(out);
-    out = fopen("test.out", "w+");
-    TAN;
-    testc.stm_->Print(out, 0);
-    fclose(out);
-    TAN;
+
     total = new tree::EseqExp(
         testc.stm_,
         new tree::EseqExp(
@@ -757,13 +740,14 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     tr::fill_label(testc.trues_, true_label);
     tr::fill_label(testc.falses_, false_label);
 
+    TAN;
     exp = new tr::NxExp(new tree::SeqStm(
         testc.stm_,
         new tree::SeqStm(new tree::LabelStm(true_label),
                          new tree::SeqStm(check_then->exp_->UnNx(),
                                           new tree::LabelStm(false_label)))));
+    TAN;
   }
-  LOG("get here\n");
 
   return new tr::ExpAndTy(exp, check_then->ty_);
 }
@@ -808,6 +792,7 @@ tr::ExpAndTy *WhileExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::fill_label(condition.trues_, body_label);
   tr::fill_label(condition.falses_, done_label);
 
+  TAN;
   exp = new tr::NxExp(new tree::SeqStm(
       new tree::LabelStm(test_label),
       new tree::SeqStm(
@@ -821,6 +806,7 @@ tr::ExpAndTy *WhileExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                           new tree::NameExp(test_label),
                           new std::vector<temp::Label *>(1, test_label)),
                       new tree::LabelStm(done_label)))))));
+  TAN;
 
   return new tr::ExpAndTy(exp, ty);
 }
@@ -954,6 +940,7 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       it_dec++;
       // 遍历所有的declaration，生成一个seqstm
       for (; it_dec != get_dec.end(); it_dec++) {
+        LOG("get_dec [size = %d]\n", get_dec.size());
         exp = (*it_dec)->Translate(venv, tenv, level, label, errormsg);
         dec = new tree::SeqStm(dec, exp->UnNx());
       }
@@ -969,23 +956,17 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   // TODO:这里删除了一个stm为空的可能
   // 将let部分和body部分整合
   res = new tree::EseqExp(dec, check_body->exp_->UnEx());
-  // 最终整合为一个expstm
-  dec = new tree::ExpStm(res);
-  // TODO:这里删除了对main函数的判断
-  // 放入frags
-  if (level == nullptr || level->frame_ == nullptr) {
-    BENULL;
-  } else {
-    NONULL;
-  }
+
   static bool isMain = true;
   if (isMain) {
+    LOG("it's main\n");
+    // 最终整合为一个expstm
+    dec = new tree::ExpStm(res);
     frags->PushBack(new frame::ProcFrag(dec, level->frame_));
     isMain = false;
   }
   exp = new tr::ExExp(res);
   ty = check_body->ty_->ActualTy();
-  TAN;
   return new tr::ExpAndTy(exp, ty);
 }
 
@@ -1066,6 +1047,7 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     // 建立新的Level
     tr::Level *new_level =
         new tr::Level(level, (*it_funcs)->name_, (*it_funcs)->params_);
+    // LOG("new level [size = %d]\n", new_level->frame_->fromals_->size());
     // 如果没有范数值，默认为void
     type::Ty *res = type::VoidTy::Instance();
     // 区分是否有返回值
@@ -1109,6 +1091,8 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     auto it_formal_types = get_formal_types.begin();
     auto it_records = get_records.begin();
     auto it_formal_accs = formal_accs->begin();
+    it_formal_accs++; //跳过staticlink
+    // LOG("get success [size = %d]\n", formal_accs->size());
     for (; it_records != get_records.end();) {
       venv->Enter(
           (*it_records)->name_,
@@ -1139,7 +1123,7 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     frags->PushBack(new_one);
   }
 #ifdef test
-  LOG("get here\n");
+  LOG("function dec finished ~~ here\n");
 #endif
   return TranslateNilExp();
 }
@@ -1181,6 +1165,7 @@ tr::Exp *TypeDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 #ifdef test
   COMMANLOG("Translate TypeDec level %s label %s\n", level, label);
 #endif
+  //第一部分，检查重名
   auto get_types = types_->GetList();
   auto it_type = get_types.begin();
   for (; it_type != get_types.end(); it_type++) {
@@ -1192,7 +1177,7 @@ tr::Exp *TypeDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     tenv->Enter((*it_type)->name_,
                 new type::NameTy((*it_type)->name_, nullptr));
   }
-
+  // 第二部分，翻译
   it_type = get_types.begin();
   for (; it_type != get_types.end(); it_type++) {
     type::NameTy *name_ty = (type::NameTy *)tenv->Look((*it_type)->name_);
@@ -1202,13 +1187,17 @@ tr::Exp *TypeDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   //  再次遍历所有的属性看是否有循环
   bool hasCycle = false;
   it_type = get_types.begin();
+  { // test
+    type::NameTy *name_ty = (type::NameTy *)tenv->Look((*it_type)->name_);
+  }
+
   for (; it_type != get_types.end(); it_type++) {
     type::Ty *ty = tenv->Look((*it_type)->name_);
     //如果有名字类型
-    if (!DIFF(ty, type::NameTy)) {
+    if (SAME(ty, type::NameTy)) {
       type::Ty *tyTy = ((type::NameTy *)ty)->ty_;
       // 一直向下翻译查找
-      while (!DIFF(tyTy, type::NameTy)) {
+      while (SAME(tyTy, type::NameTy)) {
         type::NameTy *nameTy = (type::NameTy *)tyTy;
         //但凡中间有一个的名字与外层相同
         if (nameTy->sym_->Name() == (*it_type)->name_->Name()) {

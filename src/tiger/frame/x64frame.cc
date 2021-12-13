@@ -12,7 +12,8 @@ public:
   /* TODO: Put your lab5 code here */
   // TODO:这是啥
   tree::Exp *ToExp(tree::Exp *framePtr) const {
-    return new tree::MemExp(framePtr, new tree::ConstExp(offset));
+    // 传入fp，结合自己的offset取到值
+    return new tree::MemExp(new tree::ConstExp(offset), framePtr);
   }
 };
 
@@ -103,6 +104,10 @@ tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
   auto get_stm = static_list->GetList();
   auto it_stm = get_stm.begin();
   tree::Stm *bind = nullptr;
+  if (it_stm != get_stm.end()) {
+    bind = (*it_stm);
+    it_stm++;
+  }
   for (; it_stm != get_stm.end(); it_stm++) {
     bind = new tree::SeqStm((*it_stm), bind);
   }
@@ -134,12 +139,12 @@ assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
   prolog.append(std::string(instr));
   // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\tsubq $%d , %%rsp\n", frame->s_offset_);
+  sprintf(instr, "\tsubq $%d , %%rsp\n", -frame->s_offset_);
   prolog.append(std::string(instr));
 
   // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\taddq $%d, %%rsp\n\n", frame->s_offset_);
+  sprintf(instr, "\taddq $%d, %%rsp\n\n", -frame->s_offset_);
   std::string epilog = std::string(instr);
   epilog.append(std::string("\tretq\n\n"));
   FLOG("exit 3 finished ~~~\n");

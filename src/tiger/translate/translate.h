@@ -10,6 +10,14 @@
 #include "tiger/frame/frame.h"
 #include "tiger/semant/types.h"
 
+#define LOG(format, args...)                                                   \
+  do {                                                                         \
+    FILE *debug_log = fopen("tiger.log", "a+");                                \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+
 namespace tr {
 
 class Exp;
@@ -37,9 +45,11 @@ public:
     std::vector<bool> *escapes = new std::vector<bool>(0);
     auto get_par = params->GetList();
     auto it_par = get_par.begin();
+    escapes->push_back(true);
     for (; it_par != get_par.end(); it_par++) {
       escapes->push_back((*it_par)->escape_);
     }
+    // LOG("escape [size = %d]\n", escapes->size());
     frame_ = new frame::X64Frame(name, escapes);
     parent_ = parent;
   }
