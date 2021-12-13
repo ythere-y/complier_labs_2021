@@ -126,6 +126,7 @@ public:
     temp::TempList *res = CalleeSaves();
     res->Append(ReturnValue());
     res->Append(StackPointer());
+    return res;
   }
   temp::Temp *RDX() { return regs_[3]; }
 

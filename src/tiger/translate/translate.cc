@@ -23,11 +23,11 @@
     fclose(debug_log);                                                         \
   } while (0)
 
-#define COMMANLOG(format, level, label)                                        \
+#define COMMANLOG(format, level, label, args...)                               \
   do {                                                                         \
     LOG((format),                                                              \
         temp::LabelFactory::LabelString((level)->frame_->label_).c_str(),      \
-        temp::LabelFactory::LabelString((label)).c_str());                     \
+        temp::LabelFactory::LabelString((label)).c_str(), ##args);             \
   } while (0)
 
 extern frame::Frags *frags;
@@ -789,8 +789,10 @@ tr::ExpAndTy *WhileExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   temp::Label *done_label = temp::LabelFactory::NewLabel();
   tr::ExpAndTy *check_test =
       test_->Translate(venv, tenv, level, label, errormsg);
+  LOG("finish test~~~\n");
   tr::ExpAndTy *check_body =
       body_->Translate(venv, tenv, level, done_label, errormsg);
+  LOG("finish body~~~\n");
   if (DIFF(check_test->ty_, type::IntTy)) {
     errormsg->Error(test_->pos_, "integer required");
     return new tr::ExpAndTy(exp, ty);
@@ -869,45 +871,47 @@ tr::ExpAndTy *ForExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
    * var:=lo
    * __limit_var__ := hi
    */
-  DecList *front_dec =
-      new DecList(new VarDec(0, var_, sym::Symbol::UniqueSymbol("int"), lo_));
-  front_dec->Prepend(new VarDec(0, sym::Symbol::UniqueSymbol("__limit_var__"),
+  DecList *front_dec = new DecList(
+      new VarDec(pos_, var_, sym::Symbol::UniqueSymbol("int"), lo_));
+  front_dec->Prepend(new VarDec(pos_,
+                                sym::Symbol::UniqueSymbol("__limit_var__"),
                                 sym::Symbol::UniqueSymbol("int"), hi_));
   /*
    * var <= __limit_var__
    */
-  OpExp *inner_test = new OpExp(
-      0, Oper::LE_OP, new VarExp(0, new SimpleVar(0, var_)),
-      new VarExp(0,
-                 new SimpleVar(0, sym::Symbol::UniqueSymbol("__limit_var__"))));
-  /*
-   * body
-   */
-  ExpList *inner_body_list = new ExpList(body_);
+  OpExp *inner_test =
+      new OpExp(pos_, Oper::LE_OP, new VarExp(pos_, new SimpleVar(pos_, var_)),
+                new VarExp(pos_, new SimpleVar(pos_, sym::Symbol::UniqueSymbol(
+                                                         "__limit_var__"))));
+
   /*
    * if var == __limit_var__
    * then break
    */
   IfExp *inner_if = new IfExp(
-      0,
-      new OpExp(0, Oper::EQ_OP, new VarExp(0, new SimpleVar(0, var_)),
-                new VarExp(0, new SimpleVar(0, sym::Symbol::UniqueSymbol(
-                                                   "__limit_var__")))),
-      new BreakExp(0), NULL);
+      pos_,
+      new OpExp(pos_, Oper::EQ_OP, new VarExp(pos_, new SimpleVar(pos_, var_)),
+                new VarExp(pos_, new SimpleVar(pos_, sym::Symbol::UniqueSymbol(
+                                                         "__limit_var__")))),
+      new BreakExp(pos_), NULL);
   /*
    * var := var + 1
    */
-  AssignExp *inner_add =
-      new AssignExp(0, new SimpleVar(0, var_),
-                    new OpExp(0, PLUS_OP, new VarExp(0, new SimpleVar(0, var_)),
-                              new IntExp(0, 1)));
+  AssignExp *inner_add = new AssignExp(
+      pos_, new SimpleVar(pos_, var_),
+      new OpExp(pos_, PLUS_OP, new VarExp(pos_, new SimpleVar(pos_, var_)),
+                new IntExp(pos_, 1)));
+  /*
+   * re-build body
+   */
+  ExpList *inner_body_list = new ExpList(inner_add);
   inner_body_list->Prepend(inner_if);
-  inner_body_list->Prepend(inner_add);
+  inner_body_list->Prepend(body_);
 
   WhileExp *hole_while =
-      new WhileExp(0, inner_test, new SeqExp(0, inner_body_list));
+      new WhileExp(pos_, inner_test, new SeqExp(pos_, inner_body_list));
 
-  absyn::Exp *forexp_to_letexp = new absyn::LetExp(0, front_dec, hole_while);
+  absyn::Exp *forexp_to_letexp = new absyn::LetExp(pos_, front_dec, hole_while);
 
   return forexp_to_letexp->Translate(venv, tenv, level, label, errormsg);
 }
@@ -962,7 +966,6 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       body_->Translate(venv, tenv, level, label, errormsg);
   venv->EndScope();
   tenv->EndScope();
-  TAN;
   // TODO:这里删除了一个stm为空的可能
   // 将let部分和body部分整合
   res = new tree::EseqExp(dec, check_body->exp_->UnEx());
@@ -975,8 +978,11 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   } else {
     NONULL;
   }
-  frags->PushBack(new frame::ProcFrag(dec, level->frame_));
-  TAN;
+  static bool isMain = true;
+  if (isMain) {
+    frags->PushBack(new frame::ProcFrag(dec, level->frame_));
+    isMain = false;
+  }
   exp = new tr::ExExp(res);
   ty = check_body->ty_->ActualTy();
   TAN;
@@ -1143,7 +1149,8 @@ tr::Exp *VarDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                            err::ErrorMsg *errormsg) const {
   /* TODO: Put your lab5 code here */
 #ifdef test
-  COMMANLOG("Translate VarDec level %s label %s\n", level, label);
+  COMMANLOG("Translate VarDec level %s label %s[name = %s]\n", level, label,
+            var_->Name().c_str());
 #endif
 
   tr::ExpAndTy *check_init =

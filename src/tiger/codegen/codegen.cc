@@ -38,6 +38,7 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
     (*it_stm)->Munch(*instr_list, fs_);
   }
   restoreCalleeRegs(*instr_list, fs_);
+  CLOG("code gen finished ~~~~~\n");
 
   frame::ProcEntryExit2(instr_list);
 }
@@ -101,6 +102,7 @@ void POP(temp::Temp *src, assem::InstrList &instr_list, std::string_view fs) {
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   // tree::MoveStm *s = (tree::MoveStm*)
+  CLOG("[seqstm]\n");
   left_->Munch(instr_list, fs);
   right_->Munch(instr_list, fs);
   return;
@@ -108,12 +110,14 @@ void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void LabelStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Label stm]\n");
   assem::LabelInstr *res = new assem::LabelInstr(label_->Name(), label_);
   instr_list.Append(res);
 }
 
 void JumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Jump stm]\n");
   temp::Label *label = exp_->name_;
   temp::TempList *dst = nullptr;
   temp::TempList *src = nullptr;
@@ -127,6 +131,7 @@ void JumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Cjump stm]\n");
   temp::TempList *dst = nullptr;
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
@@ -134,9 +139,9 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::Temp *left = left_->Munch(instr_list, fs);
   temp::Temp *right = right_->Munch(instr_list, fs);
 
-  src = new temp::TempList(right);
-  dst = L(left);
-  instr_list.Append(new assem::OperInstr("cmp `d0,`s1", dst, src, jumps));
+  src = L(left);
+  dst = L(right);
+  instr_list.Append(new assem::OperInstr("cmp `d0,`s0", dst, src, jumps));
 
   std::string str;
   switch (op_) {
@@ -183,6 +188,7 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
 
+  CLOG("[Move stm]\n");
   temp::TempList *dst = nullptr;
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
@@ -204,11 +210,13 @@ void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void ExpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Exp stm]\n");
   exp_->Munch(instr_list, fs);
 }
 
 temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Binop Exp ]\n");
   temp::Temp *left = left_->Munch(instr_list, fs);
   temp::Temp *right = right_->Munch(instr_list, fs);
   temp::Temp *reg = temp::TempFactory::NewTemp();
@@ -265,6 +273,7 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Mem Exp ]\n");
   temp::Temp *r = exp_->Munch(instr_list, fs);
   temp::Temp *reg = temp::TempFactory::NewTemp();
   instr_list.Append(
@@ -274,17 +283,20 @@ temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *TempExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Temp Exp ]\n");
   return temp_;
 }
 
 temp::Temp *EseqExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Eseq Exp ]\n");
   stm_->Munch(instr_list, fs);
   return exp_->Munch(instr_list, fs);
 }
 
 temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Name Exp ]\n");
   char temp[256];
   sprintf(temp, "\tleaq %s(%%rip), `d0 ", (name_->Name().c_str()));
   temp::Temp *reg = temp::TempFactory::NewTemp();
@@ -294,6 +306,7 @@ temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Const Exp ]\n");
   char temp[256];
   sprintf(temp, "movq $%d, `d0 ", consti_);
   temp::Temp *reg = temp::TempFactory::NewTemp();
@@ -305,6 +318,7 @@ temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Call Exp ]\n");
   temp::TempList *dst = reg_manager->CalleeSaves();
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
@@ -351,6 +365,7 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
                                    std::string_view fs) {
   /* TODO: Put your lab5 code here */
+  CLOG("[Munch Args ]\n");
 
   temp::TempList *res = new temp::TempList();
   temp::TempList *dst = nullptr;

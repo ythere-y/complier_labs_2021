@@ -83,8 +83,8 @@ Access *X64Frame::allocLocal(bool escape) {
 
   Access *local;
   if (escape) {
-    local = new InFrameAccess(-s_offset_);
-    s_offset_ += reg_manager->WordSize();
+    local = new InFrameAccess(s_offset_);
+    s_offset_ -= reg_manager->WordSize();
   } else {
     // if(args_num )
     local = new InRegAccess(temp::TempFactory::NewTemp());
@@ -118,11 +118,12 @@ tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
 assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list) {
   instr_list->Append(
       new assem::OperInstr("", nullptr, reg_manager->ReturnSink(), nullptr));
+  FLOG("exit2 finished ~~\n");
   return instr_list;
 }
 // 给函数增加前缀和后缀
 assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
-
+  FLOG("get here\n");
   static char instr[256];
 
   std::string prolog;
@@ -133,14 +134,15 @@ assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
   prolog.append(std::string(instr));
   // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\tsubq $%d , %%rsp\n", -frame->s_offset_);
+  sprintf(instr, "\tsubq $%d , %%rsp\n", frame->s_offset_);
   prolog.append(std::string(instr));
 
   // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
   //         frame->label_->Name().c_str());
-  sprintf(instr, "\taddq $%d, %%rsp\n\n", -frame->s_offset_);
+  sprintf(instr, "\taddq $%d, %%rsp\n\n", frame->s_offset_);
   std::string epilog = std::string(instr);
   epilog.append(std::string("\tretq\n\n"));
+  FLOG("exit 3 finished ~~~\n");
   return new assem::Proc(prolog, instr_list, epilog);
   /*
   std::string prolog = frame->label_->Name();
