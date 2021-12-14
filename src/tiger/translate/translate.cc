@@ -311,6 +311,8 @@ tr::ExpAndTy *SubscriptVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       tree::BinOp::PLUS_OP, check_var->exp_->UnEx(),
       new tree::BinopExp(tree::BinOp::MUL_OP, check_subscript->exp_->UnEx(),
                          new tree::ConstExp(reg_manager->WordSize())))));
+  ty = ((type::ArrayTy *)check_var->ty_)->ty_->ActualTy();
+  return new tr::ExpAndTy(exp, ty);
 }
 
 tr::ExpAndTy *VarExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
