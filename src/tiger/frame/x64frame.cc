@@ -60,72 +60,39 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
     if (*it_es)
       frame_size_ += 8;
   }
-  if (frame_size_ < 8)
-    frame_size_ = 8;
 
   FLOG("escape [size = %d]\n", escapes->size());
-  //最后，需要得到返回地址
-  /*
-  if (total_num > 6) {
-    int ret_offset = (5 - total_num) * 8;
-    temp::Temp *reg = temp::TempFactory::NewTemp();
-    //这里的顺序是逆序的，不知道为什么
-    view_shift_->Append(new tree::MoveStm(
-        new tree::TempExp(reg_manager->StackPointer()),
-        new tree::BinopExp(
-            tree::BinOp::PLUS_OP, new tree::ConstExp(-8),
-            new tree::TempExp(reg_manager->StackPointer())))); //将rsp移动回去
-    //  将ret放到当前rsp中
-    view_shift_->Append(new tree::MoveStm(
-        new tree::MemExp(new tree::ConstExp(-8),
-                         new tree::TempExp(reg_manager->StackPointer())),
-        new tree::TempExp(reg)));
-    // 将stack中的ret地址取出
-    view_shift_->Append(new tree::MoveStm(
-        new tree::TempExp(reg),
-        new tree::MemExp(new tree::ConstExp(ret_offset),
-                         new tree::TempExp(reg_manager->StackPointer()))));
-    // rsp-8
-  }
-  */
 
   // 得到参数，分配到frame或者reg中
   for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
     Access *add_ac;
     if (*it_es) {
-      FLOG("one escaped[size = %d]\n", frame_size_);
       // 需要存frame中
+      // 确定在frame中的位置--相对于rsp的偏移量
+      tmp_offset = frame_size_ - 8 - to_frame_num * one_size;
+      add_ac = new InFrameAccess(to_frame_num * one_size);
+      tree::Exp *get;
+      temp::Temp *tmp_reg;
+      // 从寄存器或者stack中获得参数
       if (count < 6) {
-        // 确定在frame中的位置--相对于rsp的偏移量
-        tmp_offset = frame_size_ - 8 - to_frame_num * one_size;
-        add_ac = new InFrameAccess(to_frame_num * one_size);
-        // 增加一手将这个位置的东西移过来的操作
-        view_shift_->Append(new tree::MoveStm(
-            new tree::MemExp(new tree::ConstExp(tmp_offset),
-                             new tree::TempExp(reg_manager->StackPointer())),
-            new tree::TempExp(reg_manager->ArgRegs()->NthTemp(count))));
-        to_frame_num++;
+        tmp_reg = reg_manager->ArgRegs()->NthTemp(count);
       } else {
-        // 要从stack中取值
-        // 这里计算相对于rsp的位移
-        tmp_offset = frame_size_ - 8 - to_frame_num * one_size;
         //获取这个参数在stack中的offset;是负数
-        int stack_offset = -(total_num - count) * one_size;
-        // 这里记录的是相对于framepointer的位移
-        add_ac = new InFrameAccess(to_frame_num * one_size);
-        temp::Temp *reg = temp::TempFactory::NewTemp();
-        // 将stack中的内容移动到临时的寄存器中
+        int stack_offset = (count - 5) * one_size + frame_size_;
+        tmp_reg = temp::TempFactory::NewTemp();
         view_shift_->Append(new tree::MoveStm(
-            new tree::TempExp(reg),
+            new tree::TempExp(tmp_reg),
             new tree::MemExp(new tree::ConstExp(stack_offset),
                              new tree::TempExp(reg_manager->StackPointer()))));
-        //  将临时寄存器的值放到frame中
-        view_shift_->Append(new tree::MoveStm(
-            new tree::MemExp(new tree::ConstExp(tmp_offset),
-                             new tree::TempExp(reg_manager->StackPointer())),
-            new tree::TempExp(reg)));
-        to_frame_num++;
       }
+      //  将临时寄存器的值放到frame中
+      view_shift_->Append(new tree::MoveStm(
+          new tree::MemExp(new tree::ConstExp(tmp_offset),
+                           new tree::TempExp(reg_manager->StackPointer())),
+          new tree::TempExp(tmp_reg)));
+      FLOG("one escaped[size = %d][offset = %d]\n", frame_size_,
+           to_frame_num * one_size);
+      to_frame_num++;
     } else {
       // 需要放在寄存器中
       temp::Temp *reg = temp::TempFactory::NewTemp(); // 存放最终结果的寄存器
@@ -139,7 +106,7 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
       } else {
         // 要从stack中取值
         //获取这个参数在stack中的offset;是负数
-        int stack_offset = -(total_num - count) * one_size;
+        int stack_offset = (count - 5) * one_size + frame_size_;
         view_shift_->Append(new tree::MoveStm(
             new tree::TempExp(reg),
             new tree::MemExp(new tree::ConstExp(stack_offset),
@@ -151,28 +118,16 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
     fromals_->push_back(add_ac);
     count++;
   }
-  /*
-  if (total_num > 6) {
-    int stack_recover = (total_num - 6) * 8; // 每多一个，rsp就要移动8
-
-    view_shift_->Append(new tree::MoveStm(
-        new tree::TempExp(reg_manager->StackPointer()),
-        new tree::BinopExp(
-            tree::BinOp::PLUS_OP, new tree::ConstExp(stack_recover + 8),
-            new tree::TempExp(reg_manager->StackPointer())))); //将rsp移动回去
-  }
-  */
 }
 Access *X64Frame::allocLocal(bool escape) {
-
   Access *local;
   if (escape) {
     local = new InFrameAccess(frame_size_);
     frame_size_ += 8;
   } else {
-    // if(args_num )
     local = new InRegAccess(temp::TempFactory::NewTemp());
   }
+  locals_->push_back(local);
   return local;
 }
 tree::Exp *externalCall(std::string s, tree::ExpList *args) {

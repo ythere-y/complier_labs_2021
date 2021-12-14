@@ -89,14 +89,14 @@ temp::TempList *L(temp::Temp *one, temp::Temp *two) {
 void PUSH(int nth, temp::Temp *src, assem::InstrList &instr_list,
           std::string_view fs) {
   char assem_name[80];
-  sprintf(assem_name, "movq `s0,%d(`d0)", nth * 8);
+  sprintf(assem_name, "movq `s0,%d(`d0)", -nth * 8);
   instr_list.Append(new assem::MoveInstr(
       std::string(assem_name), L(reg_manager->StackPointer()), L(src)));
 }
 void POP(int nth, temp::Temp *dst, assem::InstrList &instr_list,
          std::string_view fs) {
   char assem_name[80];
-  sprintf(assem_name, "movq %d(`s0),`d0", nth * 8);
+  sprintf(assem_name, "movq %d(`s0),`d0", -nth * 8);
   instr_list.Append(new assem::OperInstr(
       assem_name, L(dst), L(reg_manager->StackPointer()), nullptr));
 }
@@ -328,66 +328,31 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
   int frame_size = 0;
   static char instr[256];
-  // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
-  //         temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
-  // instr_list.Append(new assem::OperInstr(instr, nullptr, nullptr, nullptr));
   temp::TempList *args_list = args_->MunchArgs(frame_size, instr_list, fs);
-  // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
-  //         temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
-  // instr_list.Append(new assem::OperInstr(instr, nullptr, nullptr, nullptr));
   int total_args = args_->GetList().size();
-  /*
-  if (total_args > 6) {
-    sprintf(assem_name, "subq $%d,`d0",
-            (total_args - 6) * reg_manager->WordSize());
-    instr_list.Append(new assem::OperInstr(
-        assem_name, L(reg_manager->StackPointer()), nullptr, nullptr));
-  }
-  */
   // call function
   char assem_name[80];
 
-  sprintf(assem_name, "call %s",
+  sprintf(assem_name, "\tcall %s",
           temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
 
   dst = reg_manager->CallerSaves();
   src = reg_manager->ArgRegs();
   instr_list.Append(
       new assem::OperInstr(std::string(assem_name), dst, src, nullptr));
-  /*
-    //参数过多，需要放栈
-    if (total_args > 6) {
-      sprintf(assem_name, "addq $%d,`d0",
-              (total_arg - 6) * reg_manager->WordSize());
-      instr_list.Append(new assem::OperInstr(
-          assem_name, L(reg_manager->StackPointer()), nullptr, nullptr));
-    }
-    */
   temp::Temp *add_one = temp::TempFactory::NewTemp();
+
   src = L(reg_manager->ReturnValue());
   dst = L(add_one);
   instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+
+  if (args_->GetList().size() > 6) {
+    char move_rsp[80];
+    sprintf(move_rsp, "\taddq $%d,`d0", (args_->GetList().size() - 6) * 8);
+    instr_list.Append(new assem::MoveInstr(
+        std::string(move_rsp), L(reg_manager->StackPointer()), nullptr));
+  }
   return add_one;
-
-  /*
-  temp::TempList *args_list = args_->MunchArgs(instr_list, fs);
-  temp::Temp *r = fun_->Munch(instr_list, fs);
-  args_list->Append(r);
-
-  instr_list.Append(new assem::OperInstr(
-      "call `s0\n", reg_manager->CalleeSaves(), args_list, nullptr));
-  return r;
-  // TODO:这里修改较多
-
-  instr_list.Append(
-      new assem::OperInstr(std::string("hello"), dst, nullptr, jumps));
-
-  temp::Temp *add_one = temp::TempFactory::NewTemp();
-  dst = new temp::TempList(add_one);
-  src = new temp::TempList(reg_manager->ReturnValue());
-  instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
-  return add_one;
-  */
 }
 
 temp::TempList *ExpList::MunchArgs(int frame_size, assem::InstrList &instr_list,
@@ -406,7 +371,7 @@ temp::TempList *ExpList::MunchArgs(int frame_size, assem::InstrList &instr_list,
     return res;
   // 遍历所有参数，每个参数找到一个合适的位置放
   int total_num = get_list.size();
-  for (int num = 0; it_list != get_list.end(); it_list++) {
+  for (int num = 0; it_list != get_list.end(); it_list++, num++) {
     temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
     src = new temp::TempList(arg);
 
@@ -417,11 +382,16 @@ temp::TempList *ExpList::MunchArgs(int frame_size, assem::InstrList &instr_list,
       dst = new temp::TempList(nth_one);
       instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
       res->Append(nth_one);
-      num++;
     } else {
       //这里的push操作是隔空push
       PUSH(total_num - num, arg, instr_list, fs);
     }
+  }
+  if (total_num > 6) {
+    char move_rsp[80];
+    sprintf(move_rsp, "\tsubq $%d,`d0", (total_num - 6) * 8);
+    instr_list.Append(new assem::MoveInstr(
+        std::string(move_rsp), L(reg_manager->StackPointer()), nullptr));
   }
   return res;
 }
