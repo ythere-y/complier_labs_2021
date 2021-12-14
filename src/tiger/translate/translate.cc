@@ -180,26 +180,10 @@ void ProgTr::Translate() { /* TODO: Put your lab5 code here */
 }
 
 tree::Exp *findStaticLink(tr::Level *target, tr::Level *level) {
-  LOG("find staticlink[frame _ size = %d]\n", level->frame_->frame_size_);
-  if (!level->parent_)
-    return new tree::TempExp(reg_manager->StackPointer());
-  LOG("it's not main\n");
-  // tree::Exp *get_rsp = new tree::TempExp(reg_manager->StackPointer());
-  // tree::Exp *staticlink = new tree::BinopExp(
-  //     tree::BinOp::PLUS_OP, new tree::ConstExp(level->frame_->frame_size_ -
-  //     8), new tree::TempExp(reg_manager->StackPointer()));
-  tree::Exp *res = new tree::BinopExp(
-      tree::BinOp::PLUS_OP, new tree::ConstExp(level->frame_->frame_size_ - 8),
-      new tree::TempExp(reg_manager->StackPointer()));
-  // 取出rsp减去一个frame_size的大小
+  tree::Exp *res = new tree::TempExp(reg_manager->FramePointer());
   while (level != target) {
-    LOG("not equal\n");
-    // 取到上一个frame的值，跳到上面去
-    res = new tree::MemExp(new tree::ConstExp(0), res);
+    res = level->frame_->fromals_->at(0)->ToExp(res);
     level = level->parent_;
-    // staticlink = new tree::MemExp(new
-    // tree::ConstExp(-reg_manager->WordSize()),
-    //                               staticlink);
   }
   return res;
 }
@@ -372,80 +356,27 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   //先将函数找到
   env::EnvEntry *entry = venv->Look(func_);
-  if (!entry || DIFF(entry, env::FunEntry)) {
-    errormsg->Error(pos_, "undefined function %s", func_->Name().c_str());
-    return new tr::ExpAndTy(exp, ty);
-  }
-
   env::FunEntry *fun_entry = (env::FunEntry *)entry;
   ty = fun_entry->result_;
   if (!ty)
     ty = type::VoidTy::Instance();
-  TAN;
   tree::ExpList *list = new tree::ExpList();
   auto get_args = args_->GetList();
-  auto get_formal = fun_entry->formals_->GetList();
   auto it_args = get_args.begin();
-  auto it_formal = get_formal.begin();
-  for (; it_args != get_args.end() && it_formal != get_formal.end();) {
+  for (; it_args != get_args.end(); it_args++) {
     tr::ExpAndTy *check_arg =
         (*it_args)->Translate(venv, tenv, level, label, errormsg);
-    if (!check_arg->ty_->IsSameType((*it_formal))) {
-      TAN;
-      errormsg->Error(pos_, "para type mismatch");
-      return new tr::ExpAndTy(exp, ty);
-    }
-    TAN;
     list->Append(check_arg->exp_->UnEx());
-    TAN;
-    it_args++;
-    it_formal++;
   }
   LOG("args over\n");
-  if (it_formal != get_formal.end()) {
-    errormsg->Error(pos_, "too little params in function %s",
-                    this->func_->Name().c_str());
-    return new tr::ExpAndTy(exp, ty);
-  }
-  if (it_args != get_args.end()) {
-    errormsg->Error(pos_, "too many params in funcion %s",
-                    this->func_->Name().c_str());
-    return new tr::ExpAndTy(exp, ty);
-  }
   if (!fun_entry->level_ || !fun_entry->level_->parent_) {
-    // temp::Label *func_name = temp::LabelFactory::NamedLabel(func_->Name());
-    // tree::NameExp *name_exp = new tree::NameExp(func_name);
     exp = new tr::ExExp(frame::externalCall(func_->Name(), list));
   } else {
-    // exp = new TR::ExExp(new T::CallExp(
-    //     new T::NameExp(func),
-    //     new T::ExpList(StaticLink(fun_entry->level->parent, level), list)));
 
     tree::Exp *staticlink =
-        new tree::BinopExp(tree::BinOp::PLUS_OP,
-                           new tree::ConstExp(level->frame_->frame_size_ - 8),
-                           new tree::TempExp(reg_manager->StackPointer()));
+        tr::findStaticLink(fun_entry->level_->parent_, level);
     list->Insert(staticlink);
-
-    // LOG("call  [size = %d]\n", list->GetList().size());
-    /*
-        int stack_move = fun_entry->level_->frame_->frame_size_;
-        tree::MoveStm *rsp_move_down = new tree::MoveStm(
-            new tree::TempExp(reg_manager->StackPointer()),
-            new tree::BinopExp(tree::BinOp::MINUS_OP,
-                               new tree::TempExp(reg_manager->StackPointer()),
-                               new tree::ConstExp(stack_move)));
-    */
     tree::CallExp *call_exp = new tree::CallExp(new tree::NameExp(func_), list);
-    /*
-        tree::MoveStm *rsp_move_up = new tree::MoveStm(
-            new tree::TempExp(reg_manager->StackPointer()),
-            new tree::BinopExp(tree::BinOp::PLUS_OP,
-                               new tree::TempExp(reg_manager->StackPointer()),
-                               new tree::ConstExp(stack_move)));
-    */
-    // tree::EseqExp *bind = new tree::EseqExp(rsp_move, call_exp);
-    // exp = new tr::ExExp(bind);
     exp = new tr::ExExp(call_exp);
   }
   return new tr::ExpAndTy(exp, ty);
@@ -473,10 +404,6 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   case Oper::MINUS_OP:
   case Oper::TIMES_OP:
   case Oper::DIVIDE_OP: {
-    if (DIFF(check_left->ty_, type::IntTy))
-      errormsg->Error(left_->pos_, "integer required");
-    if (DIFF(check_right->ty_, type::IntTy))
-      errormsg->Error(right_->pos_, "integer required");
 
     tree::BinOp key;
     switch (oper_) {
@@ -526,14 +453,8 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
     stm = new tree::CjumpStm(rel_key, check_left->exp_->UnEx(),
                              check_right->exp_->UnEx(), nullptr, nullptr);
-    // TODO:如何不使用patchlist
-    // std::vector<temp::Label *> *trues = new std::vector<temp::Label *>();
-    // std::vector<temp::Label *> *falses = new std::vector<temp::Label *>();
-    // trues->push_back(stm->true_label_);
-    // falses->push_back(stm->false_label_);
     temp::Label **trues = &(stm->true_label_);
     temp::Label **falses = &(stm->false_label_);
-    // TODO:有问题
     exp = new tr::CxExp(trues, falses, stm);
     break;
   }
@@ -822,6 +743,7 @@ tr::ExpAndTy *WhileExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   return new tr::ExpAndTy(exp, ty);
 }
+
 /*
  * let
  * 		var := lo
