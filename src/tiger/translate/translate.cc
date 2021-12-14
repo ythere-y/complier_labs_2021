@@ -180,20 +180,28 @@ void ProgTr::Translate() { /* TODO: Put your lab5 code here */
 }
 
 tree::Exp *findStaticLink(tr::Level *target, tr::Level *level) {
-  LOG("find staticlink[frame _ size = %d]\n", level->frame_->s_offset_);
-  tree::Exp *get_rsp = new tree::TempExp(reg_manager->StackPointer());
-  tree::Exp *staticlink = new tree::TempExp(reg_manager->FramePointer());
+  LOG("find staticlink[frame _ size = %d]\n", level->frame_->frame_size_);
+  if (!level->parent_)
+    return new tree::TempExp(reg_manager->StackPointer());
+  LOG("it's not main\n");
+  // tree::Exp *get_rsp = new tree::TempExp(reg_manager->StackPointer());
+  // tree::Exp *staticlink = new tree::BinopExp(
+  //     tree::BinOp::PLUS_OP, new tree::ConstExp(level->frame_->frame_size_ -
+  //     8), new tree::TempExp(reg_manager->StackPointer()));
+  tree::Exp *res = new tree::BinopExp(
+      tree::BinOp::PLUS_OP, new tree::ConstExp(level->frame_->frame_size_ - 8),
+      new tree::TempExp(reg_manager->StackPointer()));
   // 取出rsp减去一个frame_size的大小
   while (level != target) {
     LOG("not equal\n");
     // 取到上一个frame的值，跳到上面去
-    staticlink = (*(level->frame_->fromals_->begin()))->ToExp(staticlink);
+    res = new tree::MemExp(new tree::ConstExp(0), res);
+    level = level->parent_;
     // staticlink = new tree::MemExp(new
     // tree::ConstExp(-reg_manager->WordSize()),
     //                               staticlink);
-    level = level->parent_;
   }
-  return staticlink;
+  return res;
 }
 } // namespace tr
 
@@ -202,6 +210,7 @@ tr::Exp *TranslateNilExp() { return new tr::ExExp(new tree::ConstExp(0)); }
 tr::Exp *TranslateSimpleVar(tr::Access *access, tr::Level *level) {
   // 翻译单个的简单值，要去找到staticlink
   tree::Exp *staticlink = tr::findStaticLink(access->level_, level);
+
   staticlink = access->access_->ToExp(staticlink);
   return new tr::ExExp(staticlink);
 }
@@ -290,23 +299,13 @@ tr::ExpAndTy *SubscriptVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::ExpAndTy *check_var = var_->Translate(venv, tenv, level, label, errormsg);
   tr::Exp *exp = nullptr;
   type::Ty *ty = type::IntTy::Instance();
-  if (typeid(check_var->ty_->ActualTy()) != typeid(type::ArrayTy)) {
+  if (DIFF(check_var->ty_->ActualTy(), type::ArrayTy)) {
     errormsg->Error(pos_, "array type required");
     return new tr::ExpAndTy(exp, ty);
   }
 
   tr::ExpAndTy *check_subscript =
       subscript_->Translate(venv, tenv, level, label, errormsg);
-  if (typeid(check_subscript->ty_->ActualTy()) != typeid(type::IntTy)) {
-    errormsg->Error(pos_, "array index must be interger");
-    return new tr::ExpAndTy(exp, ty);
-  }
-
-  if (DIFF(check_var->exp_, tr::ExExp) ||
-      DIFF(check_subscript->exp_, tr::ExExp)) {
-    errormsg->Error(
-        pos_, "Error: subscriptVar's loc or subscript must be an expression");
-  }
 
   exp = new tr::ExExp(new tree::MemExp(new tree::BinopExp(
       tree::BinOp::PLUS_OP, check_var->exp_->UnEx(),
@@ -389,13 +388,14 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   for (; it_args != get_args.end() && it_formal != get_formal.end();) {
     tr::ExpAndTy *check_arg =
         (*it_args)->Translate(venv, tenv, level, label, errormsg);
-    TAN;
     if (!check_arg->ty_->IsSameType((*it_formal))) {
       TAN;
       errormsg->Error(pos_, "para type mismatch");
       return new tr::ExpAndTy(exp, ty);
     }
+    TAN;
     list->Append(check_arg->exp_->UnEx());
+    TAN;
     it_args++;
     it_formal++;
   }
@@ -418,12 +418,32 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     // exp = new TR::ExExp(new T::CallExp(
     //     new T::NameExp(func),
     //     new T::ExpList(StaticLink(fun_entry->level->parent, level), list)));
-    tree::Exp *staticlink =
-        tr::findStaticLink(fun_entry->level_->parent_, level);
-    list->Insert(staticlink);
-    // LOG("call  [size = %d]\n", list->GetList().size());
-    tree::CallExp *call_exp = new tree::CallExp(new tree::NameExp(func_), list);
 
+    tree::Exp *staticlink =
+        new tree::BinopExp(tree::BinOp::PLUS_OP,
+                           new tree::ConstExp(level->frame_->frame_size_ - 8),
+                           new tree::TempExp(reg_manager->StackPointer()));
+    list->Insert(staticlink);
+
+    // LOG("call  [size = %d]\n", list->GetList().size());
+    /*
+        int stack_move = fun_entry->level_->frame_->frame_size_;
+        tree::MoveStm *rsp_move_down = new tree::MoveStm(
+            new tree::TempExp(reg_manager->StackPointer()),
+            new tree::BinopExp(tree::BinOp::MINUS_OP,
+                               new tree::TempExp(reg_manager->StackPointer()),
+                               new tree::ConstExp(stack_move)));
+    */
+    tree::CallExp *call_exp = new tree::CallExp(new tree::NameExp(func_), list);
+    /*
+        tree::MoveStm *rsp_move_up = new tree::MoveStm(
+            new tree::TempExp(reg_manager->StackPointer()),
+            new tree::BinopExp(tree::BinOp::PLUS_OP,
+                               new tree::TempExp(reg_manager->StackPointer()),
+                               new tree::ConstExp(stack_move)));
+    */
+    // tree::EseqExp *bind = new tree::EseqExp(rsp_move, call_exp);
+    // exp = new tr::ExExp(bind);
     exp = new tr::ExExp(call_exp);
   }
   return new tr::ExpAndTy(exp, ty);
@@ -925,6 +945,13 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   type::Ty *ty = type::VoidTy::Instance();
   tree::Exp *res = nullptr;
 
+  static bool have_Main = false;
+  bool im_main = false;
+  if (!have_Main) {
+    have_Main = true;
+    im_main = true;
+  }
+
   // 开始新的一层
   LOG("translate the let\n");
   venv->BeginScope();
@@ -955,13 +982,11 @@ tr::ExpAndTy *LetExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   // 将let部分和body部分整合
   res = new tree::EseqExp(dec, check_body->exp_->UnEx());
 
-  static bool isMain = true;
-  if (isMain) {
+  if (im_main) {
     LOG("it's main\n");
     // 最终整合为一个expstm
     dec = new tree::ExpStm(res);
     frags->PushBack(new frame::ProcFrag(dec, level->frame_));
-    isMain = false;
   }
   exp = new tr::ExExp(res);
   ty = check_body->ty_->ActualTy();

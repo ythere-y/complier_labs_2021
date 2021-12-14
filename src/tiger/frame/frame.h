@@ -96,6 +96,8 @@ public:
   std::vector<Access *> *locals_;
   tree::StmList *view_shift_;
   int frame_num_;
+  int frame_size_; // frame的大小
+  int args_size_;  // args占据的大小
   int s_offset_;
   int maxArgs = 0;
 

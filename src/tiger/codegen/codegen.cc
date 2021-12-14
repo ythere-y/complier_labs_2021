@@ -86,17 +86,19 @@ temp::TempList *L(temp::Temp *one, temp::Temp *two) {
   res->Append(two);
   return res;
 }
-void PUSH(temp::Temp *src, assem::InstrList &instr_list, std::string_view fs) {
-  instr_list.Append(new assem::OperInstr(
-      "subq $8,`d0", L(reg_manager->StackPointer()), nullptr, nullptr));
+void PUSH(int nth, temp::Temp *src, assem::InstrList &instr_list,
+          std::string_view fs) {
+  char assem_name[80];
+  sprintf(assem_name, "movq `s0,%d(`d0)", nth * 8);
   instr_list.Append(new assem::MoveInstr(
-      "movq `s0,(`d0)", L(reg_manager->StackPointer()), L(src)));
+      std::string(assem_name), L(reg_manager->StackPointer()), L(src)));
 }
-void POP(temp::Temp *src, assem::InstrList &instr_list, std::string_view fs) {
-  instr_list.Append(new assem::MoveInstr("movq (`s0),`d0", L(src),
-                                         L(reg_manager->StackPointer())));
+void POP(int nth, temp::Temp *dst, assem::InstrList &instr_list,
+         std::string_view fs) {
+  char assem_name[80];
+  sprintf(assem_name, "movq %d(`s0),`d0", nth * 8);
   instr_list.Append(new assem::OperInstr(
-      "addq $8,`d0", L(reg_manager->StackPointer()), nullptr, nullptr));
+      assem_name, L(dst), L(reg_manager->StackPointer()), nullptr));
 }
 
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
@@ -254,13 +256,13 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
     // 被除数放到rax中
     instr_list.Append(new assem::MoveInstr(
         "movq `s0,`d0", L(reg_manager->ReturnValue()), L(left)));
-    PUSH(reg_manager->RDX(), instr_list, fs);
+    PUSH(1, reg_manager->RDX(), instr_list, fs);
     //对rax进行拓展，放到rdx中
     instr_list.Append(new assem::OperInstr("cqto", nullptr, nullptr, nullptr));
     src = L(right);
     // 除数作为参数操作数放入
     instr_list.Append(new assem::OperInstr("idivq `s0", dst, src, jumps));
-    POP(reg_manager->RDX(), instr_list, fs);
+    POP(1, reg_manager->RDX(), instr_list, fs);
     src = L(reg_manager->ReturnValue());
     dst = L(reg);
     // 将结果从rax中移到reg
@@ -323,9 +325,28 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::TempList *src = nullptr;
   assem::Targets *jumps = new assem::Targets(nullptr);
   // prepare the params
-  temp::TempList *args_list = args_->MunchArgs(instr_list, fs);
+
+  int frame_size = 0;
+  static char instr[256];
+  // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
+  //         temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
+  // instr_list.Append(new assem::OperInstr(instr, nullptr, nullptr, nullptr));
+  temp::TempList *args_list = args_->MunchArgs(frame_size, instr_list, fs);
+  // sprintf(instr, "\taddq $%s_framesize, %%rsp\n",
+  //         temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
+  // instr_list.Append(new assem::OperInstr(instr, nullptr, nullptr, nullptr));
+  int total_args = args_->GetList().size();
+  /*
+  if (total_args > 6) {
+    sprintf(assem_name, "subq $%d,`d0",
+            (total_args - 6) * reg_manager->WordSize());
+    instr_list.Append(new assem::OperInstr(
+        assem_name, L(reg_manager->StackPointer()), nullptr, nullptr));
+  }
+  */
   // call function
   char assem_name[80];
+
   sprintf(assem_name, "call %s",
           temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
 
@@ -333,11 +354,18 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   src = reg_manager->ArgRegs();
   instr_list.Append(
       new assem::OperInstr(std::string(assem_name), dst, src, nullptr));
-
+  /*
+    //参数过多，需要放栈
+    if (total_args > 6) {
+      sprintf(assem_name, "addq $%d,`d0",
+              (total_arg - 6) * reg_manager->WordSize());
+      instr_list.Append(new assem::OperInstr(
+          assem_name, L(reg_manager->StackPointer()), nullptr, nullptr));
+    }
+    */
   temp::Temp *add_one = temp::TempFactory::NewTemp();
   src = L(reg_manager->ReturnValue());
   dst = L(add_one);
-
   instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
   return add_one;
 
@@ -362,7 +390,7 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   */
 }
 
-temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
+temp::TempList *ExpList::MunchArgs(int frame_size, assem::InstrList &instr_list,
                                    std::string_view fs) {
   /* TODO: Put your lab5 code here */
   CLOG("[Munch Args ]\n");
@@ -377,7 +405,7 @@ temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
   if (it_list == get_list.end())
     return res;
   // 遍历所有参数，每个参数找到一个合适的位置放
-
+  int total_num = get_list.size();
   for (int num = 0; it_list != get_list.end(); it_list++) {
     temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
     src = new temp::TempList(arg);
@@ -391,7 +419,8 @@ temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
       res->Append(nth_one);
       num++;
     } else {
-      PUSH(arg, instr_list, fs);
+      //这里的push操作是隔空push
+      PUSH(total_num - num, arg, instr_list, fs);
     }
   }
   return res;
