@@ -277,7 +277,7 @@ tr::ExpAndTy *FieldVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
         exp = new tr::ExExp(new tree::MemExp(
             check_var->exp_->UnEx(),
             new tree::ConstExp(order * reg_manager->WordSize())));
-        type::Ty *ty = (*it_fi)->ty_->ActualTy();
+        ty = (*it_fi)->ty_->ActualTy();
         break;
       }
       order++;
@@ -502,14 +502,6 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   case Oper::GT_OP:
   case Oper::GE_OP:
   case Oper::NEQ_OP: {
-    if (DIFF(check_left->ty_, type::IntTy) &&
-        DIFF(check_left->ty_, type::StringTy))
-      errormsg->Error(left_->pos_, "integer or string required");
-    if (DIFF(check_right->ty_, type::IntTy) &&
-        DIFF(check_right->ty_, type::StringTy))
-      errormsg->Error(right_->pos_, "integer or string required");
-    if (!check_left->ty_->IsSameType(check_right->ty_))
-      errormsg->Error(pos_, "same type required");
 
     tree::CjumpStm *stm;
     tree::RelOp rel_key;

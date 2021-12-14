@@ -247,7 +247,8 @@ type::Ty *RecordExp::SemAnalyze(env::VEnvPtr venv, env::TEnvPtr tenv,
       return type::IntTy::Instance();
     }
     //类型必须相同
-    if (typeid(*field_ty) != typeid(*(*records_it)->ty_)) {
+    if (!field_ty->IsSameType((*records_it)->ty_) &&
+        typeid(*((*records_it)->ty_)) != typeid(type::NameTy)) {
       errormsg->Error(pos_, "field type mismatch");
       return type::IntTy::Instance();
     }
