@@ -4,8 +4,11 @@
 #include "tiger/output/logger.h"
 #include "tiger/output/output.h"
 #include "tiger/parse/parser.h"
-#include "tiger/semant/semant.h"
 #include "tiger/translate/translate.h"
+#include "tiger/semant/semant.h"
+
+frame::RegManager *reg_manager;
+frame::Frags *frags;
 
 frame::RegManager *reg_manager;
 frame::Frags *frags;

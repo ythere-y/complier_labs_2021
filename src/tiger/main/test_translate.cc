@@ -49,8 +49,9 @@ int main(int argc, char **argv) {
       errormsg = prog_tr.TransferErrormsg();
     }
 
-    if (errormsg->AnyErrors())
+    if (errormsg->AnyErrors()) {
       return 1; // Don't continue if error occurrs
+    }
   }
 
   return 0;

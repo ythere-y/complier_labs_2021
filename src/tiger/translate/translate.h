@@ -8,15 +8,8 @@
 #include "tiger/env/env.h"
 #include "tiger/errormsg/errormsg.h"
 #include "tiger/frame/frame.h"
+#include "tiger/frame/x64frame.h"
 #include "tiger/semant/types.h"
-
-#define LOG(format, args...)                                                   \
-  do {                                                                         \
-    FILE *debug_log = fopen("tiger.log", "a+");                                \
-    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
-    fprintf(debug_log, format, ##args);                                        \
-    fclose(debug_log);                                                         \
-  } while (0)
 
 namespace tr {
 
@@ -28,9 +21,10 @@ class Access {
 public:
   Level *level_;
   frame::Access *access_;
+
   Access(Level *level, frame::Access *access)
       : level_(level), access_(access) {}
-  static Access *AllocLocal(Level *level, bool escape);
+  static Access *allocLocal(Level *level, bool escape);
 };
 
 class Level {
@@ -40,31 +34,25 @@ public:
 
   /* TODO: Put your lab5 code here */
   Level(frame::Frame *frame, Level *parent) : frame_(frame), parent_(parent) {}
-  Level(Level *parent, temp::Label *name, absyn::FieldList *params) {
-    // TODO:需要想办法构建Frame
-    std::vector<bool> *escapes = new std::vector<bool>(0);
-    auto get_par = params->GetList();
-    auto it_par = get_par.begin();
-    escapes->push_back(true);
-    for (; it_par != get_par.end(); it_par++) {
-      escapes->push_back((*it_par)->escape_);
-    }
-    // LOG("escape [size = %d]\n", escapes->size());
-    frame_ = new frame::X64Frame(name, escapes);
-    parent_ = parent;
-  }
-  Level() {}
+  std::vector<Access *> *Formals();
+
+  static tr::Level *NewLevel(Level *parent, temp::Label *name,
+                             std::vector<bool> *formals);
 };
 
 class ProgTr {
 public:
-  /* TODO: Put your lab5 code here */
   // TODO: Put your lab5 code here */
+
   ProgTr(std::unique_ptr<absyn::AbsynTree> absyn_tree,
          std::unique_ptr<err::ErrorMsg> erromsg)
       : absyn_tree_(std::move(absyn_tree)), errormsg_(std::move(erromsg)),
         tenv_(std::make_unique<env::TEnv>()),
-        venv_(std::make_unique<env::VEnv>()) {}
+        venv_(std::make_unique<env::VEnv>()) 
+        {
+          main_level_.reset(new Level(frame::X64Frame::newFrame(
+              temp::LabelFactory::NamedLabel("outerFrame"), nullptr), nullptr));
+        }
 
   /**
    * Translate IR tree
@@ -83,6 +71,7 @@ private:
   std::unique_ptr<absyn::AbsynTree> absyn_tree_;
   std::unique_ptr<err::ErrorMsg> errormsg_;
   std::unique_ptr<Level> main_level_;
+  // Level *main_level_;
   std::unique_ptr<env::TEnv> tenv_;
   std::unique_ptr<env::VEnv> venv_;
 

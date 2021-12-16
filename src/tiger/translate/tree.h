@@ -81,10 +81,7 @@ class SeqStm : public Stm {
 public:
   Stm *left_, *right_;
 
-  SeqStm(Stm *left, Stm *right) : left_(left), right_(right) {
-    assert(left);
-    assert(right);
-  }
+  SeqStm(Stm *left, Stm *right) : left_(left), right_(right) { assert(left); }
   ~SeqStm() override;
 
   void Print(FILE *out, int d) const override;
@@ -169,8 +166,7 @@ public:
 
   virtual void Print(FILE *out, int d) const = 0;
   virtual canon::StmAndExp Canon() = 0;
-  virtual temp::Temp *Munch(assem::InstrList &instr_list,
-                            std::string_view fs) = 0;
+  virtual temp::Temp *Munch(assem::InstrList &instr_list, std::string_view fs) = 0;
 };
 
 class BinopExp : public Exp {
@@ -192,11 +188,6 @@ public:
   Exp *exp_;
 
   explicit MemExp(Exp *exp) : exp_(exp) {}
-
-  MemExp(Exp *left, Exp *right) {
-    exp_ = new BinopExp(BinOp::PLUS_OP, right, left);
-  }
-
   ~MemExp() override;
 
   void Print(FILE *out, int d) const override;
@@ -275,8 +266,7 @@ public:
   void Insert(Exp *exp) { exp_list_.push_front(exp); }
   std::list<Exp *> &GetNonConstList() { return exp_list_; }
   const std::list<Exp *> &GetList() { return exp_list_; }
-  temp::TempList *MunchArgs(int frame_size, assem::InstrList &instr_list,
-                            std::string_view fs);
+  temp::TempList *MunchArgs(assem::InstrList &instr_list, std::string_view fs);
 
 private:
   std::list<Exp *> exp_list_;
@@ -287,9 +277,10 @@ class StmList {
 
 public:
   StmList() = default;
+  StmList(std::initializer_list<Stm *> list) : stm_list_(list) {}
 
+  void Append(Stm *stm) {stm_list_.push_back(stm);}
   const std::list<Stm *> &GetList() { return stm_list_; }
-  void Append(Stm *stm) { stm_list_.push_back(stm); }
   void Linear(Stm *stm);
   void Print(FILE *out) const;
 

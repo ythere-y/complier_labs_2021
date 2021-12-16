@@ -9,7 +9,7 @@ namespace temp {
 
 using Label = sym::Symbol;
 
-class LabelFactory { // 使用这个东西构造出新的Label
+class LabelFactory {
 public:
   static Label *NewLabel();
   static Label *NamedLabel(std::string_view name);
@@ -28,13 +28,12 @@ public:
 
 private:
   int num_;
-  explicit Temp(int num)
-      : num_(num) {} //构造函数是private，只能通过友元类TempFactory构建
+  explicit Temp(int num) : num_(num) {}
 };
 
 class TempFactory {
 public:
-  static Temp *NewTemp(); // 使用这个东西构造出新的Temp
+  static Temp *NewTemp();
 
 private:
   int temp_id_ = 100;
@@ -52,7 +51,7 @@ public:
   static Map *LayerMap(Map *over, Map *under);
 
 private:
-  tab::Table<Temp, std::string> *tab_; // 这个管理一个Temp到string的映射
+  tab::Table<Temp, std::string> *tab_;
   Map *under_;
 
   Map() : tab_(new tab::Table<Temp, std::string>()), under_(nullptr) {}
@@ -65,11 +64,6 @@ public:
   explicit TempList(Temp *t) : temp_list_({t}) {}
   TempList(std::initializer_list<Temp *> list) : temp_list_(list) {}
   TempList() = default;
-  TempList(TempList *most, int len) {
-    for (int i = 0; i < len; i++) {
-      this->Append(most->NthTemp(i));
-    }
-  }
   void Append(Temp *t) { temp_list_.push_back(t); }
   [[nodiscard]] Temp *NthTemp(int i) const;
   [[nodiscard]] const std::list<Temp *> &GetList() const { return temp_list_; }

@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cstdio>
-
 namespace {
 
 void Indent(FILE *out, int d) {

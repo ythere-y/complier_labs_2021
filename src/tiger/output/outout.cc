@@ -14,15 +14,14 @@ void AssemGen::GenAssem(bool need_ra) {
   // Output proc
   phase = frame::Frag::Proc;
   fprintf(out_, ".text\n");
-  for (auto &&frag : frags->GetList()) {
+  for (auto &&frag : frags->GetList())
     frag->OutputAssem(out_, phase, need_ra);
-  }
+
   // Output string
   phase = frame::Frag::String;
   fprintf(out_, ".section .rodata\n");
-  for (auto &&frag : frags->GetList()) {
+  for (auto &&frag : frags->GetList())
     frag->OutputAssem(out_, phase, need_ra);
-  }
 }
 
 } // namespace output
@@ -32,11 +31,13 @@ namespace frame {
 void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
   std::unique_ptr<canon::Traces> traces;
   std::unique_ptr<cg::AssemInstr> assem_instr;
-  //   std::unique_ptr<ra::Result> allocation;
+//   std::unique_ptr<ra::Result> allocation;
 
   // When generating proc fragment, do not output string assembly
   if (phase != Proc)
     return;
+
+  
 
   TigerLog("-------====IR tree=====-----\n");
   TigerLog(body_);
@@ -64,8 +65,7 @@ void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
     traces = canon.TransferTraces();
   }
 
-  temp::Map *color =
-      temp::Map::LayerMap(reg_manager->temp_map_, temp::Map::Name());
+  temp::Map *color = temp::Map::LayerMap(reg_manager->temp_map_, temp::Map::Name());
   {
     // Lab 5: code generation
     TigerLog("-------====Code generate=====-----\n");
@@ -78,10 +78,10 @@ void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
   assem::InstrList *il = assem_instr.get()->GetInstrList();
 
   TigerLog("-------====Output assembly for %s=====-----\n",
-           frame_->label_->Name().data());
+           frame_->name_->Name().data());
 
   assem::Proc *proc = frame::ProcEntryExit3(frame_, il);
-
+  
   std::string proc_name = frame_->GetLabel()->Name();
 
   fprintf(out, ".globl %s\n", proc_name.data());

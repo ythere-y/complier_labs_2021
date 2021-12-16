@@ -10,10 +10,6 @@ public:
 
   explicit InFrameAccess(int offset) : offset(offset) {}
   /* TODO: Put your lab5 code here */
-  tree::Exp *ToExp(tree::Exp *framePtr) const {
-    // 传入fp，结合自己的offset取到值
-    return new tree::MemExp(new tree::ConstExp(-offset), framePtr);
-  }
 };
 
 class InRegAccess : public Access {
@@ -22,169 +18,174 @@ public:
 
   explicit InRegAccess(temp::Temp *reg) : reg(reg) {}
   /* TODO: Put your lab5 code here */
-  tree::Exp *ToExp(tree::Exp *framePtr) const { return new tree::TempExp(reg); }
 };
 
 /* TODO: Put your lab5 code here */
 
-X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
-  int word_size = reg_manager->WordSize();
-
-  this->label_ = name;
-  this->fromals_ = new std::vector<Access *>();
-  this->locals_ = new std::vector<Access *>();
-  this->view_shift_ = new tree::StmList();
-  this->s_offset_ = -word_size;
-  this->frame_num_ = 0;
-  this->frame_size_ = 0;
-  this->args_size_ = 0;
-
-  if (!escapes) //是main函数啦
-  {
-    return;
-  }
-  int count = 0; //总的参数的计数器
-  int one_size = reg_manager->WordSize();
-  int tmp_offset = 0;
-  int to_frame_num = 0;                      // 要放到frame中的编号
-  int to_reg_num = 0;                        // 要放到reg中的编号
-  int total_num = escapes->size();           // 得到所有参数数量
-  int arg_size = (total_num - 5) * one_size; // 传递参数所用的空间
-  if (total_num <= 6)
-    arg_size = 0; // 如果参数数量不超过6，那么就不需要栈传递
-  this->args_size_ = arg_size;
-  // 先记录frame的size
-
-  for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
-    if (*it_es)
-      frame_size_ += 8;
-  }
-
-  FLOG("escape [size = %d]\n", escapes->size());
-
-  // 得到参数，分配到frame或者reg中
-  for (auto it_es = escapes->begin(); it_es != escapes->end(); it_es++) {
-    Access *add_ac;
-    if (*it_es) {
-      // 需要存frame中
-      // 确定在frame中的位置--相对于rsp的偏移量
-      tmp_offset = frame_size_ - 8 - to_frame_num * one_size;
-      add_ac = new InFrameAccess(to_frame_num * one_size);
-      tree::Exp *get;
-      temp::Temp *tmp_reg;
-      // 从寄存器或者stack中获得参数
-      if (count < 6) {
-        tmp_reg = reg_manager->ArgRegs()->NthTemp(count);
-      } else {
-        //获取这个参数在stack中的offset;是负数
-        int stack_offset = (count - 5) * one_size + frame_size_;
-        tmp_reg = temp::TempFactory::NewTemp();
-        view_shift_->Append(new tree::MoveStm(
-            new tree::TempExp(tmp_reg),
-            new tree::MemExp(new tree::ConstExp(stack_offset),
-                             new tree::TempExp(reg_manager->StackPointer()))));
-      }
-      //  将临时寄存器的值放到frame中
-      view_shift_->Append(new tree::MoveStm(
-          new tree::MemExp(new tree::ConstExp(tmp_offset),
-                           new tree::TempExp(reg_manager->StackPointer())),
-          new tree::TempExp(tmp_reg)));
-      FLOG("one escaped[size = %d][offset = %d]\n", frame_size_,
-           to_frame_num * one_size);
-      to_frame_num++;
-    } else {
-      // 需要放在寄存器中
-      temp::Temp *reg = temp::TempFactory::NewTemp(); // 存放最终结果的寄存器
-      if (count < 6) {
-        // 可以从寄存器中取值
-        // 增加一手从args的地方拿来参数的操作
-        view_shift_->Append(new tree::MoveStm(
-            new tree::TempExp(reg),
-            new tree::TempExp(reg_manager->ArgRegs()->NthTemp(count))));
-
-      } else {
-        // 要从stack中取值
-        //获取这个参数在stack中的offset;是负数
-        int stack_offset = (count - 5) * one_size + frame_size_;
-        view_shift_->Append(new tree::MoveStm(
-            new tree::TempExp(reg),
-            new tree::MemExp(new tree::ConstExp(stack_offset),
-                             new tree::TempExp(reg_manager->StackPointer()))));
-      }
-      add_ac = new InRegAccess(reg);
-    }
-
-    fromals_->push_back(add_ac);
-    count++;
-  }
-}
 Access *X64Frame::allocLocal(bool escape) {
-  Access *local;
+  frame::Access *access;
   if (escape) {
-    FLOG("[escape = %d][offset = %d]\n", escape, frame_size_);
-    local = new InFrameAccess(frame_size_);
-    frame_size_ += reg_manager->WordSize();
+    access = new InFrameAccess(offset);
+    offset -= reg_manager->WordSize();
+    this->frame_size_ += reg_manager->WordSize();
+    // this->locals.push_back(access);
   } else {
-    local = new InRegAccess(temp::TempFactory::NewTemp());
+    access = new InRegAccess(temp::TempFactory::NewTemp());
   }
-  locals_->push_back(local);
-  return local;
+  locals.push_back(access);
+  return access;
 }
-tree::Exp *externalCall(std::string s, tree::ExpList *args) {
+
+tree::Exp *X64Frame::exp(frame::Access *access, tree::Exp *framePtr) {
+  if (typeid(*access) == typeid(InFrameAccess)) {
+    return new tree::MemExp(new tree::BinopExp(
+        tree::PLUS_OP, framePtr,
+        new tree::ConstExp(((InFrameAccess *)access)->offset)));
+  } else {
+    return new tree::TempExp(((frame::InRegAccess *)access)->reg);
+  }
+}
+
+tree::Exp *X64Frame::externalCall(const std::string &s, tree::ExpList *args) {
   return new tree::CallExp(new tree::NameExp(temp::LabelFactory::NamedLabel(s)),
                            args);
 }
-// 主要进行视角转移
-tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
-  FLOG("get in\n");
 
-  auto get_stm = frame->view_shift_->GetList();
-  auto it_stm = get_stm.begin();
-  tree::Stm *bind = stm;
+Frame *X64Frame::newFrame(temp::Label *name, std::vector<bool> *_boolList) {
+  Frame *frame = new X64Frame();
+  frame->name_ = name;
+  frame->formals = std::list<frame::Access *>();
+  frame->locals = std::list<frame::Access *>();
+  frame->offset = -reg_manager->WordSize();
+  frame->frame_size_ = 0;
+  frame->viewShift = new tree::StmList();
 
-  for (; it_stm != get_stm.end(); it_stm++) {
-    bind = new tree::SeqStm((*it_stm), bind);
+  if (!_boolList) {
+    return frame;
+  }
+  std::vector<bool> boolList = *_boolList;
+
+  for (auto bool_it = boolList.begin(); bool_it != boolList.end(); bool_it++) {
+    frame::Access *access;
+    if ((*bool_it)) {
+      frame->frame_size_ += reg_manager->WordSize();
+      access = new InFrameAccess(frame->offset);
+      frame->offset -= reg_manager->WordSize();
+    } else {
+      access = new InRegAccess(temp::TempFactory::NewTemp());
+    }
+    frame->formals.push_back(access);
   }
 
-  return bind;
+  int i = 0;
+  for (auto formal_it = frame->formals.begin();
+       formal_it != frame->formals.end(); formal_it++, i++) {
+    tree::Exp *dstExp;
+    if (typeid(*(*formal_it)) == typeid(frame::InFrameAccess)) {
+      dstExp = new tree::MemExp(new tree::BinopExp(
+          tree::PLUS_OP,
+          new tree::BinopExp(tree::BinOp::PLUS_OP,
+                             new tree::TempExp(reg_manager->StackPointer()),
+                             new tree::TempExp(reg_manager->GetRegister(1))),
+          new tree::ConstExp(((frame::InFrameAccess *)(*formal_it))->offset)));
+
+    } else {
+      dstExp = new tree::TempExp(((frame::InRegAccess *)(*formal_it))->reg);
+    }
+    tree::Stm *stm;
+    if (i < 6) {
+      stm = new tree::MoveStm(
+          dstExp, new tree::TempExp(reg_manager->ArgRegs()->NthTemp(i)));
+    } else {
+      frame->frame_size_ += reg_manager->WordSize();
+      stm = new tree::MoveStm(
+          dstExp,
+          new tree::MemExp(new tree::BinopExp(
+              tree::BinOp::PLUS_OP,
+              new tree::BinopExp(
+                  tree::BinOp::PLUS_OP,
+                  new tree::TempExp(reg_manager->StackPointer()),
+                  new tree::TempExp(reg_manager->GetRegister(1))),
+              new tree::ConstExp((i - 6 + 1) * reg_manager->WordSize()))));
+    }
+    frame->viewShift->Append(stm);
+  }
+  return frame;
 }
 
-// 在函数结束后说明哪些寄存器仍需要使用
-assem::InstrList *ProcEntryExit2(assem::InstrList *instr_list) {
-  instr_list->Append(
-      new assem::OperInstr("", nullptr, reg_manager->ReturnSink(), nullptr));
-  FLOG("exit2 finished ~~\n");
-  return instr_list;
-}
-// 给函数增加前缀和后缀
-assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
-  FLOG("get here\n");
-  static char instr[256];
+static std::string reg_names[] = {
+    "%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp",
+    "%r8",  "%r9",  "%r10", "%r11", "%r12", "%r13", "%r14", "%r15"};
 
+X64RegManager::X64RegManager() {
+  std::string *name;
+  for (int i = 0; i < 16; i++) {
+    regs_.push_back(temp::TempFactory::NewTemp());
+  }
+  for (int i = 0; i < 16; i++) {
+    name = &(reg_names[i]);
+    temp_map_->Enter(regs_[i], name);
+  }
+
+  _registers = new temp::TempList({regs_[0], regs_[1], regs_[2], regs_[3],
+                                   regs_[5], regs_[6], regs_[7], regs_[8],
+                                   regs_[9], regs_[10], regs_[11], regs_[12],
+                                   regs_[13], regs_[14], regs_[15]});
+
+  _argRegs = new temp::TempList(
+      {regs_[5], regs_[4], regs_[3], regs_[2], regs_[8], regs_[9]});
+
+  _callerSaves =
+      new temp::TempList({regs_[0], regs_[5], regs_[4], regs_[3], regs_[2],
+                          regs_[8], regs_[9], regs_[10], regs_[11]});
+
+  _calleeSaves = new temp::TempList(
+      {regs_[1], regs_[6], regs_[12], regs_[13], regs_[14], regs_[15]});
+
+  _returnSink = new temp::TempList({regs_[1], regs_[6], regs_[12], regs_[13],
+                                    regs_[14], regs_[15], regs_[0], regs_[7]});
+}
+
+X64RegManager::~X64RegManager() {
+  delete _registers;
+  delete _argRegs;
+  delete _callerSaves;
+  delete _calleeSaves;
+  delete _returnSink;
+}
+
+tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
+  tree::Stm *result = stm;
+  std::list<tree::Stm *> viewShiftList = frame->viewShift->GetList();
+  if (viewShiftList.size() == 0) {
+    return result;
+  }
+  for (auto it = viewShiftList.begin(); it != viewShiftList.end(); it++) {
+    result = new tree::SeqStm((*it), result);
+  }
+  return result;
+}
+
+//Δ why can this function indicate that these registers are "active"?
+void ProcEntryExit2(assem::InstrList *body) { 
+  body->Append(
+      new assem::OperInstr("", reg_manager->ReturnSink(), nullptr, nullptr));
+}
+
+assem::Proc *ProcEntryExit3(frame::Frame *frame, assem::InstrList *body) {
+  static char instr[256] = {};
   std::string prolog;
-  sprintf(instr, ".set %s_framesize, %d\n", frame->label_->Name().c_str(),
-          frame->frame_size_);
+  sprintf(instr, "%s:\n", frame->name_->Name().c_str());
   prolog = std::string(instr);
-  sprintf(instr, "%s:\n\t subq $%d,%%rsp\n", frame->label_->Name().c_str(),
-          frame->frame_size_);
+
+  sprintf(instr, "\tsubq $%d, %%rsp\n", frame->frame_size_);
   prolog.append(std::string(instr));
 
   sprintf(instr, "\taddq $%d, %%rsp\n", frame->frame_size_);
   std::string epilog = std::string(instr);
 
-  epilog.append(std::string("\tretq\n\n"));
-  FLOG("exit 3 finished ~~~\n");
-  return new assem::Proc(prolog, instr_list, epilog);
+  epilog.append(std::string("\tretq\n"));
+  return new assem::Proc(prolog, body, epilog);
 }
-Frame::Frame(temp::Label *name, std::vector<bool> *escapes) {
-  fromals_ = new std::vector<Access *>(0);
-  auto it_esc = escapes->begin();
-  int num = 0;
-  for (; it_esc != escapes->end(); it_esc++)
-    if ((*it_esc)) {
-      fromals_->push_back(new InFrameAccess(reg_manager->WordSize() * num));
-      num++;
-    } else
-      fromals_->push_back(new InRegAccess(temp::TempFactory::NewTemp()));
-}
+
 } // namespace frame

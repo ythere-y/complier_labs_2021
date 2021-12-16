@@ -107,6 +107,7 @@ exp:
   |   sequencing {$$ = new absyn::SeqExp(scanner_.GetTokPos(), $1);}
   |   lvalue ASSIGN exp {$$ = new absyn::AssignExp(scanner_.GetTokPos(), $1, $3);}
 
+  /* TODO: The following lines may cause shift/reduce conflict.*/
   |   IF LPAREN exp RPAREN THEN exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $3, $6, nullptr);}
   |   IF LPAREN exp RPAREN THEN exp ELSE exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $3, $6, $8);}
   |   IF exp THEN exp {$$ = new absyn::IfExp(scanner_.GetTokPos(), $2, $4, nullptr);}
@@ -143,8 +144,10 @@ sequencing:
   ;
 sequencing_exps:
   exp {$$ = new absyn::ExpList($1);}
-  | exp SEMICOLON sequencing_exps { $$ = ($3)->Prepend($1);}
-
+  | exp SEMICOLON sequencing_exps {
+      $$ = ($3)->Prepend($1);
+    }
+  
   ;
 
 decs:
