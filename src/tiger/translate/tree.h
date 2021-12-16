@@ -194,7 +194,7 @@ public:
   explicit MemExp(Exp *exp) : exp_(exp) {}
 
   MemExp(Exp *left, Exp *right) {
-    exp_ = new BinopExp(BinOp::PLUS_OP, left, right);
+    exp_ = new BinopExp(BinOp::PLUS_OP, right, left);
   }
 
   ~MemExp() override;

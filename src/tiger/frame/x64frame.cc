@@ -10,7 +10,6 @@ public:
 
   explicit InFrameAccess(int offset) : offset(offset) {}
   /* TODO: Put your lab5 code here */
-  // TODO:这是啥
   tree::Exp *ToExp(tree::Exp *framePtr) const {
     // 传入fp，结合自己的offset取到值
     return new tree::MemExp(new tree::ConstExp(-offset), framePtr);
@@ -124,7 +123,7 @@ Access *X64Frame::allocLocal(bool escape) {
   if (escape) {
     FLOG("[escape = %d][offset = %d]\n", escape, frame_size_);
     local = new InFrameAccess(frame_size_);
-    frame_size_ += 8;
+    frame_size_ += reg_manager->WordSize();
   } else {
     local = new InRegAccess(temp::TempFactory::NewTemp());
   }
@@ -139,21 +138,13 @@ tree::Exp *externalCall(std::string s, tree::ExpList *args) {
 tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
   FLOG("get in\n");
 
-  tree::StmList *static_list = frame->view_shift_;
-  auto get_stm = static_list->GetList();
+  auto get_stm = frame->view_shift_->GetList();
   auto it_stm = get_stm.begin();
-  tree::Stm *bind = nullptr;
-  if (it_stm != get_stm.end()) {
-    bind = (*it_stm);
-    it_stm++;
-  }
+  tree::Stm *bind = stm;
+
   for (; it_stm != get_stm.end(); it_stm++) {
     bind = new tree::SeqStm((*it_stm), bind);
   }
-  if (bind) {
-    bind = new tree::SeqStm(bind, stm);
-  } else
-    bind = stm;
 
   return bind;
 }
@@ -176,33 +167,14 @@ assem::Proc *ProcEntryExit3(Frame *frame, assem::InstrList *instr_list) {
   prolog = std::string(instr);
   sprintf(instr, "%s:\n\t subq $%d,%%rsp\n", frame->label_->Name().c_str(),
           frame->frame_size_);
-  // sprintf(instr, "\tsubq $%s_framesize, %%rsp\n",
-  //         frame->label_->Name().c_str());
   prolog.append(std::string(instr));
 
-  // sprintf(instr, "\t addq %d,%%rsp\n", frame->frame_size_);
-  sprintf(instr, "\taddq $%d, %%rsp\n", frame->frame_size_,
-          frame->label_->Name().c_str());
-  // sprintf(instr, "\t \n");
+  sprintf(instr, "\taddq $%d, %%rsp\n", frame->frame_size_);
   std::string epilog = std::string(instr);
+
   epilog.append(std::string("\tretq\n\n"));
   FLOG("exit 3 finished ~~~\n");
   return new assem::Proc(prolog, instr_list, epilog);
-  /*H;
-  std::string prolog = frame->label_->Name();
-  prolog.append(std::string(":\n.set"));
-  prolog.append(frame->label_->Name());
-  prolog.append(std::string("_framesize,$0x10000\n"
-                            "\tpushq %rcx\n"
-                            "\tpushq %rbp\n"
-                            "\tmovq %rsp, %rbp\n"
-                            "\tsubq $0x10000, %rsp\n"));
-  std::string epilog = "\taddq $0x10000,%rsp\n"
-                       "\tpopq %rbp\n"
-                       "\tpopq %rcx\n"
-                       "\tret\n";
-  return new assem::Proc(prolog, instr_list, epilog);
-  */
 }
 Frame::Frame(temp::Label *name, std::vector<bool> *escapes) {
   fromals_ = new std::vector<Access *>(0);
