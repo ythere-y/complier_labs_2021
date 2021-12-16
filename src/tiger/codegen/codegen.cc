@@ -33,9 +33,10 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   char assem_name[maxlen];
 
   assem::InstrList *instr_list = (assem_instr_.get()->GetInstrList());
-  sprintf(assem, "movq $%d,`d0", frame_->frame_size_);
+  sprintf(assem_name, "movq $%d,`d0", frame_->frame_size_);
   instr_list->Append(new assem::MoveInstr(
-      std::string(assem_name), L(reg_manager->FramePointer()), nullptr));
+      std::string(assem_name), new temp::TempList(reg_manager->FramePointer()),
+      nullptr));
 
   saveCalleeRegs(*instr_list, fs_);
 
