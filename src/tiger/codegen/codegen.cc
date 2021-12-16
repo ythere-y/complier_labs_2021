@@ -3,6 +3,14 @@
 
 #include <cassert>
 #include <sstream>
+#define TAN CLOG("get here\n")
+#define CLOG(format, args...)                                                  \
+  do {                                                                         \
+    FILE *debug_log = fopen("tiger.log", "a+");                                \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
 
 extern frame::RegManager *reg_manager;
 
@@ -15,7 +23,8 @@ constexpr int maxlen = 1024;
 } // namespace
 
 namespace cg {
-
+#define SAME(type_a, type_b) typeid(*(type_a)) == typeid(type_b)
+#define IS_PLUS(type) (type)->op_ == tree::BinOp::PLUS_OP
 std::vector<temp::Temp *> calleeSaved(6);
 
 void saveCalleeRegs(assem::InstrList &instr_list) {
@@ -68,6 +77,7 @@ void AssemInstr::Print(FILE *out, temp::Map *map) const {
 
 namespace tree {
 /* TODO: Put your lab5 code here */
+temp::TempList *L(temp::Temp *inner) { return new temp::TempList(inner); }
 
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
@@ -182,9 +192,9 @@ void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
       tree::Exp *e2 = src;
       /** MOVE(MEM(CONST(i)), e2) */
       temp::Temp *e2temp = e2->Munch(instr_list, fs);
-      instr_list.Append(new assem::OperInstr(
-          "movq (some const), `s0", nullptr, //Δ
-          new temp::TempList({e2temp}), nullptr));
+      instr_list.Append(
+          new assem::OperInstr("movq (some const), `s0", nullptr, //Δ
+                               new temp::TempList({e2temp}), nullptr));
     } else {
       tree::Exp *e1 = memDst->exp_, *e2 = src;
       /** MOVE(MEM(e1), e2) */
@@ -301,50 +311,11 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *MemExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  temp::Temp *r = temp::TempFactory::NewTemp();
-  if (typeid(*this->exp_) == typeid(tree::BinopExp) &&
-      ((tree::BinopExp *)this->exp_)->op_ == tree::PLUS_OP &&
-      typeid(*((tree::BinopExp *)this->exp_)->right_) ==
-          typeid(tree::ConstExp)) {
-    tree::Exp *e1 = ((tree::BinopExp *)this->exp_)->left_;
-    /** MEM(BINOP(PLUS, e1, CONST(i))) */
-    temp::Temp *e1temp = e1->Munch(instr_list, fs);
-    std::stringstream stream;
-    stream
-        << "movq "
-        << ((tree::ConstExp *)((tree::BinopExp *)this->exp_)->right_)->consti_
-        << "(`s0), `d0";
-    std::string assem = stream.str();
-    instr_list.Append(new assem::OperInstr(
-        assem, new temp::TempList({r}), new temp::TempList({e1temp}), nullptr));
-  } else if (typeid(*this->exp_) == typeid(tree::BinopExp) &&
-             ((tree::BinopExp *)this->exp_)->op_ == tree::PLUS_OP &&
-             typeid(*((tree::BinopExp *)this->exp_)->left_) ==
-                 typeid(tree::ConstExp)) {
-    tree::Exp *e1 = ((tree::BinopExp *)this->exp_)->right_;
-    /** MEM(BINOP(PLUS, CONST(i), e1)) */
-    temp::Temp *e1temp = e1->Munch(instr_list, fs);
-    std::stringstream stream;
-    stream << "movq "
-           << ((tree::ConstExp *)((tree::BinopExp *)this->exp_)->left_)->consti_
-           << "(`s0), `d0";
-    std::string assem = stream.str();
-    instr_list.Append(new assem::OperInstr(
-        assem, new temp::TempList({r}), new temp::TempList({e1temp}), nullptr));
-  } else if (typeid(*this->exp_) == typeid(tree::ConstExp)) {
-    /** MEM(CONST(i)) */
-    instr_list.Append(
-        new assem::OperInstr("movq111", new temp::TempList({r}), //Δ
-                             nullptr, nullptr));
-  } else {
-    tree::Exp *e1 = this->exp_;
-    /** MEM(e1) */
-    temp::Temp *e1temp = e1->Munch(instr_list, fs);
-    instr_list.Append(
-        new assem::OperInstr("movq (`s0), `d0", new temp::TempList({r}),
-                             new temp::TempList({e1temp}), nullptr));
-  }
-  return r;
+  temp::Temp *src = exp_->Munch(instr_list, fs);
+  temp::Temp *reg = temp::TempFactory::NewTemp();
+  instr_list.Append(
+      new assem::OperInstr("movq (`s0),`d0", L(reg), L(src), nullptr));
+  return reg;
 }
 
 temp::Temp *TempExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
@@ -354,7 +325,6 @@ temp::Temp *TempExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 temp::Temp *EseqExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  // assert((this->stm_ && this->exp_);
   this->stm_->Munch(instr_list, fs);
   return this->exp_->Munch(instr_list, fs);
 }
@@ -374,12 +344,11 @@ temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   temp::Temp *r = temp::TempFactory::NewTemp();
-  std::stringstream stream;
-  stream << "movq $" << this->consti_ << ", `d0";
+  char assem_name[maxlen];
+  sprintf(assem_name, "movq $%d,`d0", consti_);
 
-  std::string assem = stream.str();
-  instr_list.Append(
-      new assem::OperInstr(assem, new temp::TempList({r}), nullptr, nullptr));
+  instr_list.Append(new assem::OperInstr(
+      std::string(assem_name), new temp::TempList({r}), nullptr, nullptr));
   return r;
 }
 
