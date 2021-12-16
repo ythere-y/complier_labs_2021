@@ -31,7 +31,13 @@ namespace tr {
 
 Access *Access::AllocLocal(Level *level, bool escape) {
   /* TODO: Put your lab5 code here */
-  return new Access(level, level->frame_->allocLocal(escape));
+  int out = 1;
+  if (!escape)
+    out = 0;
+  LOG("into alloclocal,[escape = %d]\n", out);
+  Access *res = new Access(level, level->frame_->allocLocal(escape));
+  LOG("frame [size = %d]\n", level->frame_->frame_size_);
+  return res;
 }
 
 class Cx {
@@ -180,8 +186,19 @@ void ProgTr::Translate() { /* TODO: Put your lab5 code here */
 }
 
 tree::Exp *findStaticLink(tr::Level *target, tr::Level *level) {
-  tree::Exp *res = new tree::TempExp(reg_manager->FramePointer());
+  // tree::Exp *res = new tree::TempExp(reg_manager->FramePointer());
+  LOG("need static\n");
+  int sl = 8;
+  // if (level->parent_)
+  //   sl = 8;
+  // else
+  //   sl = 0;
+  tree::Exp *res = new tree::BinopExp(
+      tree::BinOp::PLUS_OP, new tree::ConstExp(level->frame_->frame_size_ - sl),
+      new tree::TempExp(reg_manager->StackPointer()));
+  LOG("[frame_size = %d][sl = %d]\n", level->frame_->frame_size_, sl);
   while (level != target) {
+    LOG("[not equal]\n");
     res = level->frame_->fromals_->at(0)->ToExp(res);
     level = level->parent_;
   }
@@ -193,6 +210,7 @@ namespace absyn {
 tr::Exp *TranslateNilExp() { return new tr::ExExp(new tree::ConstExp(0)); }
 tr::Exp *TranslateSimpleVar(tr::Access *access, tr::Level *level) {
   // 翻译单个的简单值，要去找到staticlink
+  LOG("into translate simplevar\n");
   tree::Exp *staticlink = tr::findStaticLink(access->level_, level);
 
   staticlink = access->access_->ToExp(staticlink);
@@ -221,9 +239,6 @@ tr::ExpAndTy *SimpleVar::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::Exp *exp = nullptr;
   type::Ty *ty = type::IntTy::Instance();
   env::EnvEntry *entry = venv->Look(sym_);
-
-  if (!entry || DIFF(entry, env::VarEntry))
-    errormsg->Error(pos_, "undefined variable %s", sym_->Name().c_str());
 
   env::VarEntry *var_entry = (env::VarEntry *)entry;
   exp = TranslateSimpleVar(var_entry->access_, level);
@@ -324,7 +339,8 @@ tr::ExpAndTy *IntExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                 err::ErrorMsg *errormsg) const {
 /* TODO: Put your lab5 code here */
 #ifdef test
-  COMMANLOG("Translate IntExp level %s label %s\n", level, label);
+  COMMANLOG("Translate IntExp level %s label %s[int = %d]\n", level, label,
+            val_);
 #endif
   return new tr::ExpAndTy(new tr::ExExp(new tree::ConstExp(val_)),
                           type::IntTy::Instance());
@@ -577,6 +593,7 @@ tr::ExpAndTy *SeqExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 }
 
 tr::Exp *TranslateAssignExp(tr::Exp *var, tr::Exp *exp) {
+  LOG("assign exp\n");
   return new tr::NxExp(new tree::MoveStm(var->UnEx(), exp->UnEx()));
 }
 
@@ -756,7 +773,35 @@ tr::ExpAndTy *WhileExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
  * 				var := var+1
  * end
  */
+tr::Exp *translateFor(tr::Level *level, frame::Access *access, tr::Exp *lo,
+                      tr::Exp *hi, tr::Exp *body, temp::Label *doneLabel) {
+  LOG("into translateFor\n");
+  temp::Label *bodyLabel = temp::LabelFactory::NewLabel(),
+              *testLabel = temp::LabelFactory::NewLabel();
 
+  tree::Exp *i = access->ToExp(new tree::TempExp(reg_manager->FramePointer()));
+  std::vector<temp::Label *> *labelList =
+      new std::vector<temp::Label *>(1, testLabel);
+  return new tr::NxExp(new tree::SeqStm(
+      new tree::MoveStm(i, lo->UnEx()),
+      new tree::SeqStm(
+          new tree::LabelStm(testLabel),
+          new tree::SeqStm(
+              new tree::CjumpStm(tree::LE_OP, i, hi->UnEx(), bodyLabel,
+                                 doneLabel),
+              new tree::SeqStm(
+                  new tree::LabelStm(bodyLabel),
+                  new tree::SeqStm(
+                      body->UnNx(),
+                      new tree::SeqStm(
+                          new tree::MoveStm(
+                              i, new tree::BinopExp(tree::PLUS_OP, i,
+                                                    new tree::ConstExp(1))),
+                          new tree::SeqStm(
+                              new tree::JumpStm(new tree::NameExp(testLabel),
+                                                labelList),
+                              new tree::LabelStm(doneLabel)))))))));
+}
 tr::ExpAndTy *ForExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                 tr::Level *level, temp::Label *label,
                                 err::ErrorMsg *errormsg) const {
@@ -1079,18 +1124,8 @@ tr::Exp *VarDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::ExpAndTy *check_init =
       init_->Translate(venv, tenv, level, label, errormsg);
   tr::Access *access;
-  if (!typ_) {
-    if (!DIFF(check_init->ty_, type::NilTy))
-      errormsg->Error(pos_, "init should not be nil without type specified");
-  } else {
-    type::Ty *ty = tenv->Look(typ_);
-    if (SAME(check_init->ty_, type::NilTy) &&
-        DIFF(ty->ActualTy(), type::RecordTy))
-      errormsg->Error(pos_, "init should not be nil without type specified");
-    if (ty && !ty->IsSameType(check_init->ty_))
-      errormsg->Error(pos_, "type mismatch");
-  }
-  access = tr::Access::AllocLocal(level, true);
+
+  access = tr::Access::AllocLocal(level, escape_);
   venv->Enter(var_, new env::VarEntry(access, check_init->ty_));
 
   return TranslateAssignExp(TranslateSimpleVar(access, level),

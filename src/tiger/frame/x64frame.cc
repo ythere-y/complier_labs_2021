@@ -122,6 +122,7 @@ X64Frame::X64Frame(temp::Label *name, std::vector<bool> *escapes) {
 Access *X64Frame::allocLocal(bool escape) {
   Access *local;
   if (escape) {
+    FLOG("[escape = %d][offset = %d]\n", escape, frame_size_);
     local = new InFrameAccess(frame_size_);
     frame_size_ += 8;
   } else {

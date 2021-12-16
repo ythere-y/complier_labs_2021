@@ -246,7 +246,21 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
       instr_list.Append(new assem::OperInstr("subq `s0,`d0", dst, src, jumps));
       break;
     case tree::MUL_OP:
-      instr_list.Append(new assem::OperInstr("imulq `s0,`d0", dst, src, jumps));
+      /*
+      temp::Temp *move_rax = temp::TempFactory::NewTemp();
+      instr_list.Append(new assem::MoveInstr("movq `s0,`d0", L(move_rax),
+                                             L(reg_manager->ReturnValue())));
+      */
+      instr_list.Append(new assem::MoveInstr(
+          "movq `s0,`d0", L(reg_manager->ReturnValue()), L(left)));
+      instr_list.Append(
+          new assem::OperInstr("imulq `s0", nullptr, L(right), jumps));
+      instr_list.Append(new assem::MoveInstr("movq `s0,`d0", L(reg),
+                                             L(reg_manager->ReturnValue())));
+      /*
+      instr_list.Append(new assem::MoveInstr(
+          "movq `s0,`d0", L(reg_manager->ReturnValue()), L(move_rax)));
+      */
       break;
     }
     break;
@@ -256,17 +270,14 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
     // 被除数放到rax中
     instr_list.Append(new assem::MoveInstr(
         "movq `s0,`d0", L(reg_manager->ReturnValue()), L(left)));
-    PUSH(1, reg_manager->RDX(), instr_list, fs);
     //对rax进行拓展，放到rdx中
     instr_list.Append(new assem::OperInstr("cqto", nullptr, nullptr, nullptr));
     src = L(right);
     // 除数作为参数操作数放入
     instr_list.Append(new assem::OperInstr("idivq `s0", dst, src, jumps));
-    POP(1, reg_manager->RDX(), instr_list, fs);
-    src = L(reg_manager->ReturnValue());
-    dst = L(reg);
     // 将结果从rax中移到reg
-    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", L(reg),
+                                           L(reg_manager->ReturnValue())));
     break;
   }
   }
