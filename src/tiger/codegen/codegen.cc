@@ -29,7 +29,14 @@ static void restoreCalleeRegs(assem::InstrList &instr_list,
 
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   CLOG("arrvied\n");
+
+  char assem_name[maxlen];
+
   assem::InstrList *instr_list = (assem_instr_.get()->GetInstrList());
+  sprintf(assem, "movq $%d,`d0", frame_->frame_size_);
+  instr_list->Append(new assem::MoveInstr(
+      std::string(assem_name), L(reg_manager->FramePointer()), nullptr));
+
   saveCalleeRegs(*instr_list, fs_);
 
   auto get_stm = traces_.get()->GetStmList()->GetList();
@@ -88,8 +95,8 @@ temp::TempList *L(temp::Temp *one, temp::Temp *two) {
 }
 void PUSH(int nth, temp::Temp *src, assem::InstrList &instr_list,
           std::string_view fs) {
-  char assem_name[80];
-  sprintf(assem_name, "movq `s0,%d(`d0)", -nth * 8);
+  char assem_name[maxlen];
+  sprintf(assem_name, "movq `s0,%d(`d0)", -nth * reg_manager->WordSize());
   instr_list.Append(new assem::MoveInstr(
       std::string(assem_name), L(reg_manager->StackPointer()), L(src)));
 }
@@ -310,7 +317,7 @@ temp::Temp *EseqExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   CLOG("[Name Exp ]\n");
-  char temp[256];
+  char temp[maxlen];
   sprintf(temp, "\tleaq %s(%%rip), `d0 ", (name_->Name().c_str()));
   temp::Temp *reg = temp::TempFactory::NewTemp();
   instr_list.Append(new assem::MoveInstr(std::string(temp), L(reg), nullptr));
@@ -320,12 +327,11 @@ temp::Temp *NameExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
 temp::Temp *ConstExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   CLOG("[Const Exp ]\n");
-  char temp[256];
+  char temp[maxlen];
   sprintf(temp, "movq $%d, `d0 ", consti_);
   temp::Temp *reg = temp::TempFactory::NewTemp();
-  temp::TempList *dst = L(reg);
   instr_list.Append(
-      new assem::OperInstr(std::string(temp), dst, nullptr, nullptr));
+      new assem::OperInstr(std::string(temp), L(reg), nullptr, nullptr));
   return reg;
 }
 
@@ -342,7 +348,7 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   temp::TempList *args_list = args_->MunchArgs(frame_size, instr_list, fs);
   int total_args = args_->GetList().size();
   // call function
-  char assem_name[80];
+  char assem_name[maxlen];
 
   sprintf(assem_name, "\tcall %s",
           temp::LabelFactory::LabelString(((NameExp *)fun_)->name_).c_str());
@@ -351,15 +357,15 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
   src = reg_manager->ArgRegs();
   instr_list.Append(
       new assem::OperInstr(std::string(assem_name), dst, src, nullptr));
-  temp::Temp *add_one = temp::TempFactory::NewTemp();
 
-  src = L(reg_manager->ReturnValue());
-  dst = L(add_one);
-  instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+  temp::Temp *add_one = temp::TempFactory::NewTemp();
+  instr_list.Append(new assem::MoveInstr("movq `s0,`d0", L(add_one),
+                                         L(reg_manager->ReturnValue())));
 
   if (args_->GetList().size() > 6) {
-    char move_rsp[80];
-    sprintf(move_rsp, "\taddq $%d,`d0", (args_->GetList().size() - 6) * 8);
+    char move_rsp[maxlen];
+    sprintf(move_rsp, "\taddq $%d,`d0",
+            (args_->GetList().size() - 6) * reg_manager->WordSize());
     instr_list.Append(new assem::MoveInstr(
         std::string(move_rsp), L(reg_manager->StackPointer()), nullptr));
   }
@@ -384,14 +390,13 @@ temp::TempList *ExpList::MunchArgs(int frame_size, assem::InstrList &instr_list,
   int total_num = get_list.size();
   for (int num = 0; it_list != get_list.end(); it_list++, num++) {
     temp::Temp *arg = (*it_list)->Munch(instr_list, fs);
-    src = new temp::TempList(arg);
+    src = L(arg);
 
     if (num < 6) {
       // 从参数寄存器中抽取
       assert(num < 6 && num >= 0);
       temp::Temp *nth_one = reg_manager->ArgRegs()->NthTemp(num);
-      dst = new temp::TempList(nth_one);
-      instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+      instr_list.Append(new assem::MoveInstr("movq `s0,`d0", L(nth_one), src));
       res->Append(nth_one);
     } else {
       //这里的push操作是隔空push
@@ -400,7 +405,8 @@ temp::TempList *ExpList::MunchArgs(int frame_size, assem::InstrList &instr_list,
   }
   if (total_num > 6) {
     char move_rsp[80];
-    sprintf(move_rsp, "\tsubq $%d,`d0", (total_num - 6) * 8);
+    sprintf(move_rsp, "\tsubq $%d,`d0",
+            (total_num - 6) * reg_manager->WordSize());
     instr_list.Append(new assem::MoveInstr(
         std::string(move_rsp), L(reg_manager->StackPointer()), nullptr));
   }
