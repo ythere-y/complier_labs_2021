@@ -622,10 +622,6 @@ tr::ExpAndTy *StringExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                    tr::Level *level, temp::Label *label,
                                    err::ErrorMsg *errormsg) const {
   /* TODO: Put your lab5 code here */
-  if (typeid(*this) != typeid(absyn::StringExp)) {
-    errormsg->Error(this->pos_, "not a string type");
-    return new tr::ExpAndTy(nullptr, type::VoidTy::Instance());
-  }
   return new tr::ExpAndTy(tr::translateStringExp(this->str_),
                           type::StringTy::Instance());
 }
@@ -635,11 +631,6 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                  err::ErrorMsg *errormsg) const {
   /* TODO: Put your lab5 code here */
   env::EnvEntry *x = venv->Look(this->func_);
-  if (!x || typeid(*x) != typeid(env::FunEntry)) {
-    errormsg->Error(this->pos_, "undefined function %s",
-                    this->func_->Name().c_str());
-    return new tr::ExpAndTy(nullptr, type::VoidTy::Instance());
-  }
 
   std::list<type::Ty *> formals = ((env::FunEntry *)x)->formals_->GetList();
   std::list<Exp *> args = this->args_->GetList();
@@ -653,13 +644,6 @@ tr::ExpAndTy *CallExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
         (*arg_it)->Translate(venv, tenv, level, label, errormsg);
     type::Ty *argTy = arg_translated->ty_->ActualTy();
     expList.push_back(arg_translated->exp_);
-    if ((*formal_it) != argTy && typeid(*argTy) != typeid(type::NilTy)) {
-      errormsg->Error(this->pos_, "para type mismatch");
-    }
-  }
-  if (arg_it != args.end()) {
-    errormsg->Error(this->pos_, "too many params in function %s",
-                    this->func_->Name().c_str());
   }
   return new tr::ExpAndTy(tr::translateCall(this->func_, expList, level,
                                             ((env::FunEntry *)x)->level_),
@@ -676,24 +660,6 @@ tr::ExpAndTy *OpExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
       this->right_->Translate(venv, tenv, level, label, errormsg);
   type::Ty *leftTy = left->ty_->ActualTy();
   type::Ty *rightTy = right->ty_->ActualTy();
-
-  if (this->oper_ == absyn::PLUS_OP || this->oper_ == absyn::MINUS_OP ||
-      this->oper_ == absyn::TIMES_OP || this->oper_ == absyn::DIVIDE_OP) {
-    if (typeid(*leftTy) != typeid(type::IntTy) &&
-        typeid(*leftTy) != typeid(type::NilTy)) {
-      errormsg->Error(this->left_->pos_, "integer required");
-      return new tr::ExpAndTy(nullptr, type::IntTy::Instance());
-    }
-    if (typeid(*rightTy) != typeid(type::IntTy) &&
-        typeid(*rightTy) != typeid(type::NilTy)) {
-      errormsg->Error(this->right_->pos_, "integer required");
-      return new tr::ExpAndTy(nullptr, type::IntTy::Instance());
-    }
-  } else if (!leftTy->IsSameType(rightTy) &&
-             typeid(leftTy) != typeid(type::VoidTy) &&
-             typeid(rightTy) != typeid(type::VoidTy)) {
-    errormsg->Error(this->pos_, "same type required");
-  }
 
   if (this->oper_ == absyn::PLUS_OP || this->oper_ == absyn::MINUS_OP ||
       this->oper_ == absyn::TIMES_OP || this->oper_ == absyn::DIVIDE_OP) {
@@ -716,11 +682,6 @@ tr::ExpAndTy *RecordExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                    err::ErrorMsg *errormsg) const {
   /* TODO: Put your lab5 code here */
   type::Ty *ty = tenv->Look(this->typ_)->ActualTy();
-  if (!ty) {
-    errormsg->Error(this->pos_, "undefined type %s",
-                    this->typ_->Name().c_str());
-    return new tr::ExpAndTy(nullptr, type::VoidTy::Instance());
-  }
   std::vector<tr::Exp *> expList;
   std::list<absyn::EField *> efieldList = this->fields_->GetList();
   for (auto it = efieldList.begin(); it != efieldList.end(); it++) {
@@ -758,20 +719,9 @@ tr::ExpAndTy *AssignExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::ExpAndTy *exp = this->exp_->Translate(venv, tenv, level, label, errormsg);
   type::Ty *varTy = var->ty_->ActualTy();
   type::Ty *expTy = exp->ty_->ActualTy();
-  if (typeid(*varTy) != typeid(*expTy) &&
-      typeid(*varTy) != typeid(type::VoidTy) &&
-      typeid(*expTy) != typeid(type::VoidTy) &&
-      typeid(*varTy) != typeid(type::NilTy) &&
-      typeid(*expTy) != typeid(type::NilTy)) {
-    errormsg->Error(this->pos_, "unmatched assign exp");
-    return new tr::ExpAndTy(nullptr, type::VoidTy::Instance());
-  }
 
   if (typeid(*(this->var_)) == typeid(absyn::SimpleVar)) {
     env::EnvEntry *x = venv->Look(((SimpleVar *)this->var_)->sym_);
-    if (x->readonly_) {
-      errormsg->Error(this->pos_, "loop variable can'tree be assigned");
-    }
   }
   return new tr::ExpAndTy(tr::assign(var->exp_, exp->exp_),
                           type::VoidTy::Instance());
@@ -794,15 +744,6 @@ tr::ExpAndTy *IfExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     elseeTy = elsee->ty_->ActualTy();
   }
 
-  if (!elseeTy && typeid(*thenTy) != typeid(type::VoidTy)) {
-    errormsg->Error(this->pos_, "if-then exp's body must produce no value");
-  }
-
-  if (elseeTy && typeid(*thenTy) != typeid(*elseeTy) &&
-      typeid(*thenTy) != typeid(type::NilTy) &&
-      typeid(*elseeTy) != typeid(type::NilTy)) {
-    errormsg->Error(this->pos_, "then exp and else exp type mismatch");
-  }
   return new tr::ExpAndTy(
       tr::translateIf(test_ty->exp_, then->exp_, elsee->exp_, errormsg),
       thenTy);
@@ -818,9 +759,6 @@ tr::ExpAndTy *WhileExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::ExpAndTy *body =
       this->body_->Translate(venv, tenv, level, done, errormsg);
   type::Ty *bodyTy = body->ty_;
-  if (typeid(*bodyTy) != typeid(type::VoidTy)) {
-    errormsg->Error(this->pos_, "while body must produce no value");
-  }
   return new tr::ExpAndTy(
       tr::translateWhile(test_ty->exp_, body->exp_, done, errormsg), body->ty_);
 }
@@ -835,13 +773,6 @@ tr::ExpAndTy *ForExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   tr::ExpAndTy *hi = this->hi_->Translate(venv, tenv, level, label, errormsg);
   type::Ty *loTy = lo->ty_;
   type::Ty *hiTy = hi->ty_;
-
-  if (typeid(*loTy) != typeid(type::IntTy)) {
-    errormsg->Error(this->lo_->pos_, "for exp's range type is not integer");
-  }
-  if (typeid(*hiTy) != typeid(type::IntTy)) {
-    errormsg->Error(this->hi_->pos_, "for exp's range type is not integer");
-  }
 
   tr::Access *access = tr::Access::allocLocal(level, this->escape_);
   venv->Enter(this->var_, new env::VarEntry(access, loTy, true));
@@ -896,13 +827,6 @@ tr::ExpAndTy *ArrayExp::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   /* TODO: Put your lab5 code here */
   type::Ty *ty = tenv->Look(this->typ_)->ActualTy();
 
-  if (((type::ArrayTy *)ty)->ty_->ActualTy() !=
-      this->init_->Translate(venv, tenv, level, label, errormsg)
-          ->ty_->ActualTy()) {
-    errormsg->Error(this->pos_, "type mismatch");
-    return new tr::ExpAndTy(nullptr, ty);
-  }
-
   tr::Exp *size =
       this->size_->Translate(venv, tenv, level, label, errormsg)->exp_;
   tr::Exp *init =
@@ -928,9 +852,6 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   for (auto funDec_it = funDecList.begin(); funDec_it != funDecList.end();
        funDec_it++) {
-    if (cur_venv->Look((*funDec_it)->name_)) {
-      errormsg->Error(this->pos_, "two functions have the same name");
-    }
 
     type::TyList *formals =
         make_formal_tylist(tenv, (*funDec_it)->params_, errormsg);
@@ -989,10 +910,6 @@ tr::Exp *FunctionDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
                                ((env::FunEntry *)entry)->label_,
                                errormsg); //Δ label or entry->label?
     type::Ty *bodyTy = body->ty_;
-    if (typeid(*entry) != typeid(env::FunEntry) ||
-        bodyTy != ((env::FunEntry *)entry)->result_->ActualTy()) {
-      errormsg->Error(this->pos_, "procedure returns value");
-    }
     venv->EndScope();
     tr::translateFunctionDec(body->exp_, ((env::FunEntry *)entry)->level_);
   }
@@ -1012,10 +929,6 @@ tr::Exp *VarDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
   } else if (this->typ_ && typeid(*initTy) == typeid(type::VoidTy)) {
     initTy = tenv->Look(this->typ_)->ActualTy();
   }
-  if (this->typ_ && tenv->Look(this->typ_)->ActualTy() != initTy &&
-      typeid(*initTy) != typeid(type::NilTy)) {
-    errormsg->Error(this->pos_, "type mismatch");
-  }
   tr::Access *access = tr::Access::allocLocal(level, this->escape_);
   venv->Enter(this->var_, new env::VarEntry(access, initTy));
   return new tr::NxExp(new tree::MoveStm(
@@ -1031,9 +944,6 @@ tr::Exp *TypeDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
 
   for (auto nameTy_it = nameAndTylist.begin(); nameTy_it != nameAndTylist.end();
        nameTy_it++) {
-    if (cur_tenv->Look((*nameTy_it)->name_)) {
-      errormsg->Error(this->pos_, "two types have the same name");
-    }
     cur_tenv->Enter((*nameTy_it)->name_,
                     new type::NameTy((*nameTy_it)->name_, nullptr));
     tenv->Enter((*nameTy_it)->name_,
@@ -1052,10 +962,6 @@ tr::Exp *TypeDec::Translate(env::VEnvPtr venv, env::TEnvPtr tenv,
     type::Ty *ty = cur;
     while (typeid(*ty) == typeid(type::NameTy)) {
       ty = ((type::NameTy *)ty)->ty_;
-      if (((type::NameTy *)cur)->sym_ == ((type::NameTy *)ty)->sym_) {
-        errormsg->Error(this->pos_, "illegal type cycle");
-        return nullptr;
-      }
     }
   }
   return new tr::ExExp(new tree::ConstExp(0));
