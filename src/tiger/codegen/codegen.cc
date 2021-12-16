@@ -78,7 +78,13 @@ void AssemInstr::Print(FILE *out, temp::Map *map) const {
 namespace tree {
 /* TODO: Put your lab5 code here */
 temp::TempList *L(temp::Temp *inner) { return new temp::TempList(inner); }
-
+void PUSH(int nth, temp::Temp *src, assem::InstrList &instr_list,
+          std::string_view fs) {
+  char assem_name[maxlen];
+  sprintf(assem_name, "movq `s0,%d(`d0)", -nth * reg_manager->WordSize());
+  instr_list.Append(new assem::MoveInstr(
+      std::string(assem_name), L(reg_manager->StackPointer()), L(src)));
+}
 void SeqStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
   this->left_->Munch(instr_list, fs);
@@ -136,82 +142,25 @@ void CjumpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
 
 void MoveStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
   /* TODO: Put your lab5 code here */
-  tree::Exp *dst = this->dst_, *src = this->src_;
-  if (typeid(*dst) == typeid(tree::MemExp)) {
-    tree::MemExp *memDst = (tree::MemExp *)dst;
-    if (typeid(*memDst->exp_) == typeid(tree::BinopExp) &&
-        ((tree::BinopExp *)memDst->exp_)->op_ == tree::PLUS_OP &&
-        typeid(*((tree::BinopExp *)memDst->exp_)->right_) ==
-            typeid(tree::ConstExp)) {
-      tree::Exp *e1 = ((tree::BinopExp *)memDst->exp_)->left_, *e2 = src;
-      /** MOVE(MEM(BINOP(PLUS, e1, CONST(i)), e2) */
-      temp::Temp *e1temp = e1->Munch(instr_list, fs);
-      temp::Temp *e2temp = e2->Munch(instr_list, fs);
-      std::stringstream stream;
-      stream << "movq `s0, "
-             << ((tree::ConstExp *)((tree::BinopExp *)memDst->exp_)->right_)
-                    ->consti_
-             << "(`s1)";
-      std::string assem = stream.str();
-      instr_list.Append(new assem::OperInstr(
-          assem, nullptr, new temp::TempList({e2temp, e1temp}), nullptr));
-    } else if (typeid(*memDst->exp_) == typeid(tree::BinopExp) &&
-               ((tree::BinopExp *)memDst->exp_)->op_ == tree::PLUS_OP &&
-               typeid(*((tree::BinopExp *)memDst->exp_)->left_) ==
-                   typeid(tree::ConstExp)) {
-      tree::Exp *e1 = ((tree::BinopExp *)memDst->exp_)->right_, *e2 = src;
-      /** MOVE(MEM(BINOP(PLUS, CONST(i), e1), e2) */
-      temp::Temp *e1temp = e1->Munch(instr_list, fs);
-      temp::Temp *e2temp = e2->Munch(instr_list, fs);
-      std::stringstream stream;
-      stream << "movq `s0, "
-             << ((tree::ConstExp *)((tree::BinopExp *)memDst->exp_)->left_)
-                    ->consti_
-             << "(`s1)";
-      std::string assem = stream.str();
-      assert(e1temp != reg_manager->FramePointer());
-      assert(e2temp != reg_manager->FramePointer());
-      instr_list.Append(new assem::OperInstr(
-          assem, nullptr, new temp::TempList({e2temp, e1temp}), nullptr));
-    } else if (typeid(*src) == typeid(tree::MemExp)) {
-      tree::Exp *e1 = memDst->exp_, *e2 = ((tree::MemExp *)src)->exp_;
-      /** MOVE(MEM(e1), MEM(e2)) */
-      temp::Temp *t = temp::TempFactory::NewTemp();
-      temp::Temp *e1temp = e1->Munch(instr_list, fs);
-      temp::Temp *e2temp = e2->Munch(instr_list, fs);
-      assert(e1temp != reg_manager->FramePointer());
-      assert(e2temp != reg_manager->FramePointer());
-      instr_list.Append(
-          new assem::OperInstr("movq (`s0), `d0", new temp::TempList({t}),
-                               new temp::TempList({e2temp}), nullptr));
-      instr_list.Append(new assem::OperInstr("movq `s0, (`s1)", nullptr,
-                                             new temp::TempList({t, e1temp}),
-                                             nullptr));
-    } else if (typeid(*memDst) == typeid(tree::ConstExp)) {
-      assert(false);
-      tree::Exp *e2 = src;
-      /** MOVE(MEM(CONST(i)), e2) */
-      temp::Temp *e2temp = e2->Munch(instr_list, fs);
-      instr_list.Append(
-          new assem::OperInstr("movq (some const), `s0", nullptr, //Δ
-                               new temp::TempList({e2temp}), nullptr));
-    } else {
-      tree::Exp *e1 = memDst->exp_, *e2 = src;
-      /** MOVE(MEM(e1), e2) */
-      temp::Temp *e1temp = e1->Munch(instr_list, fs);
-      temp::Temp *e2temp = e2->Munch(instr_list, fs);
-      instr_list.Append(
-          new assem::OperInstr("movq `s0, (`s1)", nullptr,
-                               new temp::TempList({e2temp, e1temp}), nullptr));
-    }
-  } else if (typeid(*dst) == typeid(tree::TempExp)) {
-    tree::Exp *e2 = src;
-    /** MOVE(temp(i), e2) */
-    temp::Temp *e2temp = e2->Munch(instr_list, fs);
-    instr_list.Append(new assem::MoveInstr(
-        "movq `s0, `d0", new temp::TempList({((tree::TempExp *)dst)->temp_}),
-        new temp::TempList({e2temp})));
+  CLOG("[Move stm]\n");
+  temp::TempList *dst = nullptr;
+  temp::TempList *src = nullptr;
+  assem::Targets *jumps = new assem::Targets(nullptr);
+
+  if (SAME(dst_, tree::TempExp)) {
+    dst = new temp::TempList(dst_->Munch(instr_list, fs));
+    src = new temp::TempList(src_->Munch(instr_list, fs));
+    instr_list.Append(new assem::MoveInstr("movq `s0,`d0", dst, src));
+  } else if (SAME(dst_, tree::MemExp)) {
+
+    dst = L(((tree::MemExp *)dst_)->exp_->Munch(instr_list, fs));
+    src = L(src_->Munch(instr_list, fs));
+
+    instr_list.Append(new assem::OperInstr("movq `s0,(`d0)", dst, src, jumps));
+  } else {
+    printf("Wrong tree::MoveStm.");
   }
+  return;
 }
 
 void ExpStm::Munch(assem::InstrList &instr_list, std::string_view fs) {
@@ -255,31 +204,15 @@ temp::Temp *BinopExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
     temp::Temp *e1temp = e1->Munch(instr_list, fs);
     temp::Temp *e2temp = e2->Munch(instr_list, fs);
 
-    // Δ rax and rdx may need to be saved
-    // temp::Temp *raxSaved = temp::TempFactory::NewTemp();
-    // temp::Temp *rdxSaved = temp::TempFactory::NewTemp();
-    // instr_list.Append(
-    //     new assem::MoveInstr("movq `s0, `d0", new temp::TempList({raxSaved}),
-    //                          new
-    //                          temp::TempList({reg_manager->ReturnValue()})));
-    // instr_list.Append(new assem::MoveInstr(
-    //     "movq `s0, `d0", new temp::TempList({rdxSaved}),
-    //     new temp::TempList({reg_manager->GetRegister(3)})));
     instr_list.Append(new assem::MoveInstr(
         "movq `s0, `d0", new temp::TempList({reg_manager->ReturnValue()}),
         new temp::TempList({e1temp})));
     instr_list.Append(new assem::OperInstr(
         "imulq `s0", nullptr, new temp::TempList({e2temp, r}), nullptr));
 
-    instr_list.Append(new assem::MoveInstr(
-        "movq `s0, `d0", new temp::TempList({r}),
-        new temp::TempList({reg_manager->ReturnValue()}))); //Δ higher 64 bits?
-    // instr_list.Append(new assem::MoveInstr(
-    //     "movq `s0, `d0", new temp::TempList({reg_manager->ReturnValue()}),
-    //     new temp::TempList({raxSaved})));
-    // instr_list.Append(new assem::MoveInstr(
-    //     "movq `s0, `d0", new temp::TempList({reg_manager->GetRegister(3)}),
-    //     new temp::TempList({rdxSaved})));
+    instr_list.Append(
+        new assem::MoveInstr("movq `s0, `d0", new temp::TempList({r}),
+                             new temp::TempList({reg_manager->ReturnValue()})));
     return r;
   }
   case tree::DIV_OP: {
@@ -374,18 +307,17 @@ temp::Temp *CallExp::Munch(assem::InstrList &instr_list, std::string_view fs) {
       new assem::MoveInstr("movq `s0, `d0", new temp::TempList({r}),
                            new temp::TempList({reg_manager->ReturnValue()})));
   if (this->args_->GetList().size() > 6) {
-    std::stringstream stream;
-    stream << "\taddq $"
-           << (this->args_->GetList().size() - 6) * reg_manager->WordSize()
-           << ", `d0";
+    char assem_name[maxlen];
+    sprintf(assem_name, "\t addq $%d,`d0",
+            (int)((args_->GetList().size() - 6) * reg_manager->WordSize()));
+
     instr_list.Append(new assem::MoveInstr(
-        stream.str(), new temp::TempList({reg_manager->StackPointer()}),
-        nullptr));
+        std::string(assem_name),
+        new temp::TempList({reg_manager->StackPointer()}), nullptr));
   }
   return r;
 }
 
-// Δ why not void
 temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
                                    std::string_view fs) {
   /* TODO: Put your lab5 code here */
@@ -402,12 +334,8 @@ temp::TempList *ExpList::MunchArgs(assem::InstrList &instr_list,
           new temp::TempList({reg_manager->ArgRegs()->NthTemp(i)}),
           new temp::TempList({arg})));
     } else {
-      std::stringstream stream;
-      stream << "movq `s0, " << -(totalnum - i) * reg_manager->WordSize()
-             << "(`d0)";
-      instr_list.Append(new assem::MoveInstr(
-          stream.str(), new temp::TempList({reg_manager->StackPointer()}),
-          new temp::TempList({arg})));
+
+      PUSH(totalnum - i, arg, instr_list, fs);
     }
   }
   if (totalnum > 6) {
