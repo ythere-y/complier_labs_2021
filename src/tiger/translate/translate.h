@@ -8,7 +8,15 @@
 #include "tiger/env/env.h"
 #include "tiger/errormsg/errormsg.h"
 #include "tiger/frame/frame.h"
+#include "tiger/frame/x64frame.h"
 #include "tiger/semant/types.h"
+#define LOG(format, args...)                                                   \
+  do {                                                                         \
+    FILE *debug_log = fopen("tiger.log", "a+");                                \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
 
 namespace tr {
 
@@ -23,7 +31,7 @@ public:
 
   Access(Level *level, frame::Access *access)
       : level_(level), access_(access) {}
-  static Access *AllocLocal(Level *level, bool escape);
+  static Access *allocLocal(Level *level, bool escape);
 };
 
 class Level {
@@ -32,11 +40,28 @@ public:
   Level *parent_;
 
   /* TODO: Put your lab5 code here */
+  Level(frame::Frame *frame, Level *parent) : frame_(frame), parent_(parent) {}
+  std::vector<Access *> *Formals();
+
+  static tr::Level *NewLevel(Level *parent, temp::Label *name,
+                             std::vector<bool> *formals);
 };
 
 class ProgTr {
 public:
-  /* TODO: Put your lab5 code here */ 
+  // TODO: Put your lab5 code here */
+
+  ProgTr(std::unique_ptr<absyn::AbsynTree> absyn_tree,
+         std::unique_ptr<err::ErrorMsg> erromsg)
+      : absyn_tree_(std::move(absyn_tree)), errormsg_(std::move(erromsg)),
+        tenv_(std::make_unique<env::TEnv>()),
+        venv_(std::make_unique<env::VEnv>()) {
+    main_level_.reset(
+        new Level(frame::X64Frame::newFrame(
+                      temp::LabelFactory::NamedLabel("outerFrame"), nullptr),
+                  nullptr));
+  }
+
   /**
    * Translate IR tree
    */
@@ -50,11 +75,11 @@ public:
     return std::move(errormsg_);
   }
 
-
 private:
   std::unique_ptr<absyn::AbsynTree> absyn_tree_;
   std::unique_ptr<err::ErrorMsg> errormsg_;
   std::unique_ptr<Level> main_level_;
+  // Level *main_level_;
   std::unique_ptr<env::TEnv> tenv_;
   std::unique_ptr<env::VEnv> venv_;
 

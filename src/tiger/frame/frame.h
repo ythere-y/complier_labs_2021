@@ -73,11 +73,24 @@ public:
   /* TODO: Put your lab5 code here */
   
   virtual ~Access() = default;
-  
 };
 
 class Frame {
   /* TODO: Put your lab5 code here */
+public:
+  temp::Label *name_; 
+  std::list<Access*> formals;
+  std::list<Access*> locals;
+  tree::StmList *viewShift; 
+  int offset;
+  int frame_size_;
+  std::list<Access*> GetFormals() {
+    return formals;
+  }
+  
+  virtual temp::Label *GetLabel() = 0;
+  virtual Access *allocLocal(bool escape) = 0;
+
 };
 
 /**
@@ -132,6 +145,12 @@ private:
 };
 
 /* TODO: Put your lab5 code here */
+tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm);
+
+void ProcEntryExit2(assem::InstrList *body);
+
+assem::Proc *ProcEntryExit3(frame::Frame *frame, assem::InstrList *body);
+
 
 } // namespace frame
 

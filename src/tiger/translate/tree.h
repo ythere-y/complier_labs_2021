@@ -277,7 +277,9 @@ class StmList {
 
 public:
   StmList() = default;
+  StmList(std::initializer_list<Stm *> list) : stm_list_(list) {}
 
+  void Append(Stm *stm) {stm_list_.push_back(stm);}
   const std::list<Stm *> &GetList() { return stm_list_; }
   void Linear(Stm *stm);
   void Print(FILE *out) const;

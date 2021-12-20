@@ -40,7 +40,10 @@ private:
 class CodeGen {
 public:
   CodeGen(frame::Frame *frame, std::unique_ptr<canon::Traces> traces)
-      : frame_(frame), traces_(std::move(traces)) {}
+      : frame_(frame), traces_(std::move(traces)) {
+    assem::InstrList *instr_list = new assem::InstrList();
+    assem_instr_ = std::make_unique<AssemInstr>(instr_list);
+  }
 
   void Codegen();
   std::unique_ptr<AssemInstr> TransferAssemInstr() {

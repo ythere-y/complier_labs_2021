@@ -34,3 +34,7 @@ _deps
 
 # python cache
 *.pyc
+
+
+# my edit
+*.md

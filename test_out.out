@@ -1,0 +1,61 @@
+ EXP(
+  ESEQ(
+   EXP(
+    CONST 0),
+   ESEQ(
+    EXP(
+     CONST 0),
+    ESEQ(
+     EXP(
+      ESEQ(
+       EXP(
+        ESEQ(
+         EXP(
+          CONST 0),
+         CALL(
+          NAME printi,
+           ESEQ(
+            MOVE(
+             temp t107,
+             BINOP(MINUS,
+              temp t107,
+              CONST 8)),
+            CALL(
+             NAME patchtest,
+              MEM(
+               BINOP(PLUS,
+                CONST 8,
+                temp t107)),
+              CONST 9,
+              CONST 4,
+              CONST 3,
+              CONST 2,
+              CONST 11,
+              CONST 11,
+              CONST 23,
+              CONST 45))))),
+       CALL(
+        NAME print,
+         NAME L16))),
+     CALL(
+      NAME printi,
+       ESEQ(
+        MOVE(
+         temp t107,
+         BINOP(MINUS,
+          temp t107,
+          CONST 8)),
+        CALL(
+         NAME patchtest,
+          MEM(
+           BINOP(PLUS,
+            CONST 8,
+            temp t107)),
+          CONST 4,
+          CONST 9,
+          CONST 3,
+          CONST 2,
+          CONST 11,
+          CONST 11,
+          CONST 23,
+          CONST 23)))))))
