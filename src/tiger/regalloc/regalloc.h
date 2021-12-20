@@ -27,6 +27,8 @@
   } while (0)
 #endif
 
+#define TAN RLOG("get here\n")
+
 namespace ra {
 
 class Result {

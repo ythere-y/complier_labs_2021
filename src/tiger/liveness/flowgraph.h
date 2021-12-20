@@ -6,6 +6,21 @@
 #include "tiger/frame/temp.h"
 #include "tiger/util/graph.h"
 
+// #define FDEBUG
+#ifdef FDEBUG
+#define FLOG(format, args...)                                                  \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "a+");                             \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+#else
+#define FLOG(format, args...)                                                  \
+  do {                                                                         \
+  } while (0)
+#endif
+
 namespace fg {
 
 using FNode = graph::Node<assem::Instr>;

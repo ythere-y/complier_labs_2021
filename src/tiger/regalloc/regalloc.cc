@@ -9,30 +9,42 @@ namespace ra {
 /* TODO: Put your lab6 code here */
 
 void RegAllocator::RegAlloc() {
+#ifdef DEBUG
+  FILE *clear_log = fopen("register.log", "w");
+  fprintf(clear_log, "\n");
+  fclose(clear_log);
+#endif
   RLOG("RegAlloc begin\n");
   fg::FlowGraphFactory flow_graph_factory(this->assemInstr_->GetInstrList());
+  TAN;
   flow_graph_factory.AssemFlowGraph();
+  TAN;
   cfg_ = flow_graph_factory.GetFlowGraph();
 
+  TAN;
   live::LiveGraphFactory live_graph_factory(cfg_);
+  TAN;
   live_graph_factory.Liveness();
   // live_graph_ = &(live_graph_factory.GetLiveGraph());
 
+  TAN;
   live_graph_ = new live::LiveGraph(live_graph_factory.GetLiveGraph());
-
+  TAN;
   Build();
+  TAN;
   MakeWorkList();
+  TAN;
   do {
     if (!simplifyWorkList.empty()) {
       Simplify();
-    } else if (workListMoves) {
+    } else if (!workListMoves->GetList().empty()) {
       Coalesce();
     } else if (!freezeWorkList.empty()) {
       Freeze();
     } else if (!spillWorkList.empty()) {
       SelectSpill();
     }
-  } while (!simplifyWorkList.empty() || workListMoves ||
+  } while (!simplifyWorkList.empty() || !workListMoves->GetList().empty() ||
            !freezeWorkList.empty() || !spillWorkList.empty());
   AssignColors();
   if (!spilledNodes.empty()) {
@@ -42,6 +54,7 @@ void RegAllocator::RegAlloc() {
     result_->coloring_ = coloring;
     result_->il_ = RemoveUnnecessary();
   }
+  TAN;
 }
 
 bool RegAllocator::precolored(temp::Temp *temp) {
@@ -79,7 +92,8 @@ void RegAllocator::Build() {
     moveListMap[(*move_it).first]->Append((*move_it).first, (*move_it).second);
     moveListMap[(*move_it).second]->Append((*move_it).first, (*move_it).second);
   }
-
+  workListMoves = this->live_graph_->moves;
+  TAN;
   std::list<live::INodePtr> interf_graph_nodeList =
       live_graph_->interf_graph->Nodes()->GetList();
   for (auto node_it = interf_graph_nodeList.begin();
@@ -262,23 +276,37 @@ bool RegAllocator::OK_forAll(live::INodeListPtr nodes, live::INodePtr r) {
 }
 
 void RegAllocator::Coalesce() {
+  TAN;
   live::INodePtr x = workListMoves->GetList().begin()->first;
   live::INodePtr y = workListMoves->GetList().begin()->second;
   live::INodePtr u, v;
-  workListMoves->Delete(x, y);
+  TAN;
 
   x = GetAlias(x);
   y = GetAlias(y);
-
+  TAN;
+  if (typeid(*y) == typeid(live::INode))
+    TAN;
+  else
+    TAN;
+  LLOG("degree = %d\n", y->OutDegree());
+  if (y->NodeInfo())
+    TAN;
+  else
+    TAN;
   if (precolored(y->NodeInfo())) { //Δ
+    TAN;
     u = y;
     v = x;
   } else {
+    TAN;
     u = x;
     v = y;
   }
 
+  workListMoves->Delete(x, y);
   //Δ
+  TAN;
   if (u == v) {
     coalescedMoves->Append(x, y);
     AddWorkList(u);
@@ -296,6 +324,7 @@ void RegAllocator::Coalesce() {
       Combine(u, v);
       AddWorkList(u);
     } else {
+      TAN;
       activeMoves->Append(x, y);
     }
   }

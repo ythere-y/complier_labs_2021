@@ -7,6 +7,24 @@
 #include "tiger/liveness/flowgraph.h"
 #include "tiger/util/graph.h"
 #include <map>
+#include <set>
+
+#define LDEBUG
+#ifdef LDEBUG
+#define LLOG(format, args...)                                                  \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "a+");                             \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+#else
+#define LLOG(format, args...)                                                  \
+  do {                                                                         \
+  } while (0)
+#endif
+
+#define LTAN LLOG("get here\n")
 
 namespace live {
 

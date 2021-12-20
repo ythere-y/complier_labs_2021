@@ -51,31 +51,49 @@ namespace assem {
 
 temp::TempList *LabelInstr::Def() const {
   /* TODO: Put your lab6 code here */
-  return nullptr;
+  FLOG("label-def\n");
+  return new temp::TempList();
 }
 
 temp::TempList *MoveInstr::Def() const {
   /* TODO: Put your lab6 code here */
-  return this->dst_; //Δ should I filter the %rsp ?
+  FLOG("move-def\n");
+  if (dst_ == nullptr)
+    return new temp::TempList();
+  return this->dst_;
 }
 
 temp::TempList *OperInstr::Def() const {
   /* TODO: Put your lab6 code here */
+  FLOG("oper-def\n");
+  if (dst_ == nullptr)
+    return new temp::TempList();
   return this->dst_;
 }
 
 temp::TempList *LabelInstr::Use() const {
   /* TODO: Put your lab6 code here */
-  return nullptr;
+  FLOG("label-use\n");
+  return new temp::TempList();
 }
 
 temp::TempList *MoveInstr::Use() const {
   /* TODO: Put your lab6 code here */
+  FLOG("move-use\n");
+  if (this->src_ == nullptr) {
+    FLOG("it's null\n");
+  }
+
+  if (src_ == nullptr)
+    return new temp::TempList();
   return this->src_;
 }
 
 temp::TempList *OperInstr::Use() const {
   /* TODO: Put your lab6 code here */
+  FLOG("oper-use\n");
+  if (src_ == nullptr)
+    return new temp::TempList();
   return this->src_;
 }
 } // namespace assem
