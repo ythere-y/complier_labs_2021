@@ -6,6 +6,7 @@
 #include "tiger/frame/x64frame.h"
 #include "tiger/liveness/flowgraph.h"
 #include "tiger/util/graph.h"
+#include <map>
 
 namespace live {
 
@@ -49,8 +50,10 @@ class LiveGraphFactory {
 public:
   explicit LiveGraphFactory(fg::FGraphPtr flowgraph)
       : flowgraph_(flowgraph), live_graph_(new IGraph(), new MoveList()),
-        in_(std::make_unique<graph::Table<assem::Instr, temp::TempList>>()),
-        out_(std::make_unique<graph::Table<assem::Instr, temp::TempList>>()),
+        // in_(std::make_unique<graph::Table<assem::Instr, temp::TempList>>()),
+        // out_(std::make_unique<graph::Table<assem::Instr, temp::TempList>>()),
+        in_(std::make_unique<std::map<fg::FNodePtr, temp::TempList *>>()),
+        out_(std::make_unique<std::map<fg::FNodePtr, temp::TempList *>>()),
         temp_node_map_(new tab::Table<temp::Temp, INode>()) {}
   void Liveness();
   LiveGraph GetLiveGraph() { return live_graph_; }
@@ -60,14 +63,20 @@ private:
   fg::FGraphPtr flowgraph_;
   LiveGraph live_graph_;
 
-  std::unique_ptr<graph::Table<assem::Instr, temp::TempList>> in_;
-  std::unique_ptr<graph::Table<assem::Instr, temp::TempList>> out_;
+  // change the table type to std::map because the former is difficult to
+  // implement the equal operation std::unique_ptr<graph::Table<assem::Instr,
+  // temp::TempList>> in_; std::unique_ptr<graph::Table<assem::Instr,
+  // temp::TempList>> out_;
+
+  std::unique_ptr<std::map<fg::FNodePtr, temp::TempList *>> in_;
+  std::unique_ptr<std::map<fg::FNodePtr, temp::TempList *>> out_;
+
   tab::Table<temp::Temp, INode> *temp_node_map_;
 
   void LiveMap();
   void InterfGraph();
+
   INodePtr GetNode(temp::Temp *temp);
-  void AddLine(temp::Temp *left, temp::Temp *right);
 };
 
 } // namespace live

@@ -1,64 +1,47 @@
 #include "tiger/liveness/liveness.h"
+#include <algorithm>
 
 extern frame::RegManager *reg_manager;
 
 namespace live {
-using NodeTempListTable = tab::Table<fg::FNodePtr, temp::TempList *>;
-using TempNodeTable = tab::Table<temp::Temp *, graph::Node<temp::Temp>>;
 
 bool contains(temp::TempList *list, temp::Temp *temp) {
-  auto get_list = list->GetList();
-  auto find_it = std::find(get_list.begin(), get_list.end(), temp);
-  return (find_it != tempList.end());
-}
-
-bool Equal(temp::TempList *left, temp::TempList *right) {
-  auto get_left = left->GetList();
-  auto get_right = right->GetList();
-  for (auto it_left : get_left)
-    if (!contains(get_right, it_left))
-      return false;
-  for (auto it_right : get_right)
-    if (!contains(get_left, it_right))
-      return false;
-  return true;
+  std::list<temp::Temp *> tempList = list->GetList();
+  std::list<temp::Temp *>::iterator iter =
+      std::find(tempList.begin(), tempList.end(), temp);
+  return (iter != tempList.end());
 }
 
 temp::TempList *Union(temp::TempList *lhs, temp::TempList *rhs) {
-  auto get_left = lhs->GetList();
-  auto get_right = rhs->GetList();
-  temp::TempList *res = new temp::TempList();
-
-  for (auto it_left : get_left)
-    res->Append(it_left);
-  for (auto it_right : get_right)
-    if (!contains(lhs, it_right))
-      res->Append(it_right);
-  return res;
+  std::list<temp::Temp *> leftList = lhs->GetList();
+  std::list<temp::Temp *> rightList = rhs->GetList();
+  temp::TempList *result = new temp::TempList();
+  for (auto ltemp_it = leftList.begin(); ltemp_it != leftList.end();
+       ltemp_it++) {
+    if (!contains(rhs, *ltemp_it)) {
+      result->Append(*ltemp_it);
+    }
+  }
+  for (auto rtemp_it = rightList.begin(); rtemp_it != rightList.end();
+       rtemp_it++) {
+    if (!contains(lhs, *rtemp_it)) {
+      result->Append(*rtemp_it);
+    }
+  }
+  return result;
 }
 
 temp::TempList *Subtract(temp::TempList *lhs, temp::TempList *rhs) {
-  auto get_left = lhs->GetList();
-  auto get_right = rhs->GetList();
-  temp::TempList *res = new temp::TempList();
-  for (auto it_left : get_left)
-    if (!contains(rhs, it_right))
-      res->Append(it_left);
-  return res;
-}
-
-void LiveGraphFactory::AddLine(temp::Temp *left, temp::Temp *right) {
-  if (!temp_node_map_->Look(left))
-    temp_node_map_->Enter(left, live_graph_.interf_graph->NewNode(left));
-  auto get_left = temp_node_map_->Look(left);
-  if (!temp_node_map_->Look(right))
-    temp_node_map_->Enter(right, live_graph_.interf_graph->NewNode(right));
-  auto get_right = temp_node_map_->Look(right);
-
-  if (get_left != get_right) {
-    live_graph_.interf_graph->AddEdge(get_left, get_right);
-    live_graph_.interf_graph->AddEdge(get_right, get_left);
+  std::list<temp::Temp *> leftList = lhs->GetList();
+  std::list<temp::Temp *> rightList = rhs->GetList();
+  temp::TempList *result = new temp::TempList();
+  for (auto ltemp_it = leftList.begin(); ltemp_it != leftList.end();
+       ltemp_it++) {
+    if (!contains(rhs, *ltemp_it)) {
+      result->Append(*ltemp_it);
+    }
   }
+  return result;
 }
 
 bool MoveList::Contain(INodePtr src, INodePtr dst) {
@@ -100,64 +83,88 @@ MoveList *MoveList::Intersect(MoveList *list) {
   return res;
 }
 
-void LiveGraphFactory::LiveMap() { /* TODO: Put your lab6 code here */
-  LOG("Live Map begin\n");
-  NodeTempListTable *in = new NodeTempListTable();
-  NodeTempListTable *out = new NodeTempListTable();
-  auto get_nodes = flowgraph_->Nodes()->GetList();
+void LiveGraphFactory::LiveMap() {
+  /* TODO: Put your lab6 code here */
 
-  int turn_num = 1;
+  std::map<fg::FNodePtr, temp::TempList *> lastIn, lastOut;
+  std::list<fg::FNodePtr> nodeList = this->flowgraph_->Nodes()->GetList();
   while (true) {
-    LOG("one turn [num = %d]\n", turn_num);
-    for (auto re_it_node = get_nodes.rbegin(); re_it_node != get_nodes.rend();
-         re_it_node++) {
-      auto old_in_list = in_->Look(*re_it_node);
-      auto old_out_list = out_->Look(*re_it_node);
-      auto defs = (*re_it_node)->NodeInfo()->Def()->GetList();
-      auto uses = (*re_it_node)->NodeInfo()->Use()->GetList();
-      temp::TempList *tmp_out = new temp::TempList();
-      temp::TempList *tmp_in = new temp::TempList();
-      for (auto succ : (*re_it_node)->Succ()->GetList()) {
-        Union(tmp_out, in_->Look(succ));
+    lastIn = *(this->in_);
+    lastOut = *(this->out_);
+
+    for (auto node_it = nodeList.begin(); node_it != nodeList.end();
+         node_it++) {
+      temp::TempList *defs = (*node_it)->NodeInfo()->Def();
+      temp::TempList *uses = (*node_it)->NodeInfo()->Use();
+      (*(this->in_))[*node_it] =
+          Union(uses, Subtract((*(this->out_))[*node_it], defs));
+      (*(this->out_))[*node_it] = nullptr;
+      std::list<fg::FNodePtr> succList = (*node_it)->Succ()->GetList();
+      for (auto succ_it = succList.begin(); succ_it != succList.end();
+           succ_it++) {
+        (*(this->out_))[*node_it] =
+            Union((*(this->out_))[*node_it], (*(this->in_))[*succ_it]);
       }
-      tmp_in = Subtract(tmp_out, defs);
-
-      out_->Set((*re_it_node), tmp_out);
-      in_->Set((*re_it_node), tmp_in);
-
-      if (Equal(old_in_list, tmp_in) && Equal(old_out_list, tmp_out))
-        break;
+    }
+    if (lastIn == (*(this->in_)) && lastOut == (*(this->out_))) {
+      break;
     }
   }
 }
 
-void LiveGraphFactory::InterfGraph() { /* TODO: Put your lab6 code here */
-  LOG("Interference Graph begin\n");
-  // step 1 register interference
-  for (auto it_reg_1 : reg_manager->Registers()->GetList()) {
-    for (auto it_reg_2 : reg_manager->Registers()->GetList()) {
-      AddLine(it_reg_1, it_reg_2);
+void LiveGraphFactory::InterfGraph() {
+  /* TODO: Put your lab6 code here */
+
+  // add precolored confliction
+  for (temp::Temp *temp1 : reg_manager->Registers()->GetList()) {
+    // Δ note that %rsp was excluded for UNKNOWN reason!
+    for (temp::Temp *temp2 : reg_manager->Registers()->GetList()) {
+      INodePtr temp1Node = GetNode(temp1);
+      INodePtr temp2Node = GetNode(temp2);
+      if (temp1Node != temp2Node) {
+        this->live_graph_.interf_graph->AddEdge(temp1Node, temp2Node);
+        this->live_graph_.interf_graph->AddEdge(temp2Node, temp1Node);
+      }
     }
   }
-  auto get_nodes = flowgraph_->Nodes()->GetList();
-  for (auto node : get_nodes) {
-    auto defs = node->NodeInfo()->Def();
-    auto uses = node->NodeInfo()->Use();
-    if (typeid(*node) != typeid(assem::MoveInstr)) {
-      // 不是移动指令
-      for (auto it_def : defs->GetList()) {
-        auto out_list = out_->Look(node)->GetList();
-        for (auto it_out_list : out_list) {
-          // TODO:是否需要加入rsp的判断
-          AddLine(it_def, it_out_list);
+
+  std::list<fg::FNodePtr> nodeList = this->flowgraph_->Nodes()->GetList();
+  for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
+    temp::TempList *defs = (*node_it)->NodeInfo()->Def();
+    temp::TempList *uses = (*node_it)->NodeInfo()->Use();
+    if (typeid(**node_it) == typeid(assem::MoveInstr) && defs && uses) {
+      // Move instruction would never have more than 1 src or dst
+      INodePtr srcNode = GetNode(uses->NthTemp(0));
+      INodePtr dstNode = GetNode(defs->NthTemp(0));
+      this->live_graph_.moves->Prepend(srcNode, dstNode);
+      std::list<temp::Temp *> outTempList =
+          (*(this->out_))[*node_it]->GetList();
+      for (auto outTemp_it = outTempList.begin();
+           outTemp_it != outTempList.end(); outTemp_it++) {
+        if (*outTemp_it == uses->NthTemp(0)) {
+          // for move instruction, there's no need to add conflict edges for src
+          // node
+          continue;
+        }
+        INodePtr outNode = GetNode(*outTemp_it);
+        if (dstNode != outNode) {
+          this->live_graph_.interf_graph->AddEdge(dstNode, outNode);
+          this->live_graph_.interf_graph->AddEdge(outNode, dstNode);
         }
       }
     } else {
-      // 是移动指令,要删除src中的一个结点
-      for (auto it_def : defs->GetList()) {
-        auto out_list = Subtract(out_->Look(node), uses)->GetList();
-        for (auto it_out_list : out_list) {
-          AddLine(it_def, it_out_list);
+      std::list<temp::Temp *> defList = defs->GetList();
+      for (auto def_it = defList.begin(); def_it != defList.end(); def_it++) {
+        std::list<temp::Temp *> outTempList =
+            (*(this->out_))[*node_it]->GetList();
+        for (auto outTemp_it = outTempList.begin();
+             outTemp_it != outTempList.end(); outTemp_it++) {
+          INodePtr dstNode = GetNode(*def_it);
+          INodePtr outNode = GetNode(*outTemp_it);
+          if (dstNode != outNode) {
+            this->live_graph_.interf_graph->AddEdge(dstNode, outNode);
+            this->live_graph_.interf_graph->AddEdge(outNode, dstNode);
+          }
         }
       }
     }
@@ -167,6 +174,14 @@ void LiveGraphFactory::InterfGraph() { /* TODO: Put your lab6 code here */
 void LiveGraphFactory::Liveness() {
   LiveMap();
   InterfGraph();
+}
+
+INodePtr LiveGraphFactory::GetNode(temp::Temp *temp) {
+  if (!this->temp_node_map_->Look(temp)) {
+    this->temp_node_map_->Enter(temp,
+                                this->live_graph_.interf_graph->NewNode(temp));
+  }
+  return this->temp_node_map_->Look(temp);
 }
 
 } // namespace live
