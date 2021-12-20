@@ -2,19 +2,19 @@
 #define TIGER_LIVENESS_LIVENESS_H_
 
 #include "tiger/codegen/assem.h"
-#include "tiger/frame/x64frame.h"
 #include "tiger/frame/temp.h"
+#include "tiger/frame/x64frame.h"
 #include "tiger/liveness/flowgraph.h"
 #include "tiger/util/graph.h"
 
 namespace live {
 
 using INode = graph::Node<temp::Temp>;
-using INodePtr = graph::Node<temp::Temp>*;
+using INodePtr = graph::Node<temp::Temp> *;
 using INodeList = graph::NodeList<temp::Temp>;
-using INodeListPtr = graph::NodeList<temp::Temp>*;
+using INodeListPtr = graph::NodeList<temp::Temp> *;
 using IGraph = graph::Graph<temp::Temp>;
-using IGraphPtr = graph::Graph<temp::Temp>*;
+using IGraphPtr = graph::Graph<temp::Temp> *;
 
 class MoveList {
 public:
@@ -66,6 +66,8 @@ private:
 
   void LiveMap();
   void InterfGraph();
+  INodePtr GetNode(temp::Temp *temp);
+  void AddLine(temp::Temp *left, temp::Temp *right);
 };
 
 } // namespace live
