@@ -28,6 +28,8 @@ public:
   static void Show(FILE *out, NodeList<T> *p,
                    std::function<void(T *)> show_info);
 
+  static void Show(FILE *out, NodeList<T> *p);
+
   int nodecount_;
 
   ~Graph();
@@ -255,6 +257,19 @@ void Graph<T>::Show(FILE *out, NodeList<T> *p,
     fprintf(out, " (%d): ", n->Key());
     for (auto q : n->Succ()->node_list_)
       fprintf(out, "%d ", q->Key());
+    for (auto q : n->Pred()->node_list_)
+      fprintf(out, "%d ", q->Key());
+    fprintf(out, "\n");
+  }
+}
+template <typename T> void Graph<T>::Show(FILE *out, NodeList<T> *p) {
+  for (Node<T> *n : p->node_list_) {
+    assert(n);
+    fprintf(out, " (%d):  succ -> [s = %d] ", n->Key(),
+            n->Succ()->node_list_.size());
+    for (auto q : n->Succ()->node_list_)
+      fprintf(out, "%d ", q->Key());
+    fprintf(out, " ..  red <- ");
     for (auto q : n->Pred()->node_list_)
       fprintf(out, "%d ", q->Key());
     fprintf(out, "\n");

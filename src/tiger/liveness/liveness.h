@@ -2,8 +2,8 @@
 #define TIGER_LIVENESS_LIVENESS_H_
 
 #include "tiger/codegen/assem.h"
-#include "tiger/frame/x64frame.h"
 #include "tiger/frame/temp.h"
+#include "tiger/frame/x64frame.h"
 #include "tiger/liveness/flowgraph.h"
 #include "tiger/util/graph.h"
 #include <map>
@@ -12,11 +12,25 @@
 namespace live {
 
 using INode = graph::Node<temp::Temp>;
-using INodePtr = graph::Node<temp::Temp>*;
+using INodePtr = graph::Node<temp::Temp> *;
 using INodeList = graph::NodeList<temp::Temp>;
-using INodeListPtr = graph::NodeList<temp::Temp>*;
+using INodeListPtr = graph::NodeList<temp::Temp> *;
 using IGraph = graph::Graph<temp::Temp>;
-using IGraphPtr = graph::Graph<temp::Temp>*;
+using IGraphPtr = graph::Graph<temp::Temp> *;
+#define DEBUG
+#ifdef DEBUG
+#define LOG(format, args...)                                                   \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "a+");                             \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+#else
+#define LOG(format, args...)                                                   \
+  do {                                                                         \
+  } while (0)
+#endif
 
 class MoveList {
 public:
@@ -64,9 +78,10 @@ private:
   fg::FGraphPtr flowgraph_;
   LiveGraph live_graph_;
 
-  // change the table type to std::map because the former is difficult to implement the equal operation
-  // std::unique_ptr<graph::Table<assem::Instr, temp::TempList>> in_;
-  // std::unique_ptr<graph::Table<assem::Instr, temp::TempList>> out_;
+  // change the table type to std::map because the former is difficult to
+  // implement the equal operation std::unique_ptr<graph::Table<assem::Instr,
+  // temp::TempList>> in_; std::unique_ptr<graph::Table<assem::Instr,
+  // temp::TempList>> out_;
 
   std::unique_ptr<std::map<fg::FNodePtr, temp::TempList *>> in_;
   std::unique_ptr<std::map<fg::FNodePtr, temp::TempList *>> out_;
@@ -75,7 +90,7 @@ private:
 
   void LiveMap();
   void InterfGraph();
-  
+
   INodePtr GetNode(temp::Temp *temp);
 };
 

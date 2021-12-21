@@ -9,8 +9,8 @@ static bool debug_flag = true;
 
 bool contains(temp::TempList *list, temp::Temp *temp) {
   std::list<temp::Temp *> tempList = list->GetList();
-  for(auto it=tempList.begin(); it!=tempList.end(); it++) {
-    if((*it)->Int() == temp->Int()) {
+  for (auto it = tempList.begin(); it != tempList.end(); it++) {
+    if ((*it)->Int() == temp->Int()) {
       return true;
     }
   }
@@ -18,6 +18,15 @@ bool contains(temp::TempList *list, temp::Temp *temp) {
   // std::list<temp::Temp *>::iterator iter =
   //     std::find(tempList.begin(), tempList.end(), temp);
   // return (iter != tempList.end());
+}
+
+void show_info(temp::Temp *out) {}
+
+void display(LiveGraph live_graph, INodeListPtr list) {
+  LOG("ready to diplay\n");
+  FILE *test_out = fopen("graph.out", "a+");
+  live_graph.interf_graph->Show(test_out, list);
+  fclose(test_out);
 }
 
 temp::TempList *Union(temp::TempList *lhs, temp::TempList *rhs) {
@@ -66,7 +75,7 @@ void MoveList::Delete(INodePtr src, INodePtr dst) {
       break;
     }
   }
-  assert(move_it!=move_list_.end());
+  assert(move_it != move_list_.end());
   move_list_.erase(move_it);
 }
 
@@ -182,27 +191,22 @@ void LiveGraphFactory::InterfGraph() {
       }
     }
   }
-
+  display(live_graph_, live_graph_.interf_graph->Nodes());
 
   std::list<fg::FNodePtr> nodeList = this->flowgraph_->Nodes()->GetList();
-  for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
+  for (auto node_it = nodeList.rbegin(); node_it != nodeList.rend();
+       node_it++) {
     temp::TempList *defs = (*node_it)->NodeInfo()->Def();
     temp::TempList *uses = (*node_it)->NodeInfo()->Use();
-    if (typeid(**node_it) == typeid(assem::MoveInstr) && !defs->GetList().empty() && !uses->GetList().empty()) {
+    if (typeid(**node_it) == typeid(assem::MoveInstr) &&
+        !defs->GetList().empty() && !uses->GetList().empty()) {
       // Move instruction would never have more than 1 src or dst
       INodePtr srcNode = GetNode(uses->NthTemp(0));
       INodePtr dstNode = GetNode(defs->NthTemp(0));
       this->live_graph_.moves->Prepend(srcNode, dstNode);
-      std::list<temp::Temp *> outTempList =
-          (*(this->out_))[*node_it]->GetList();
-      for (auto outTemp_it = outTempList.begin();
-           outTemp_it != outTempList.end(); outTemp_it++) {
-        if (*outTemp_it == uses->NthTemp(0)) {
-          // for move instruction, there's no need to add conflict edges for src
-          // node
-          continue;
-        }
-        INodePtr outNode = GetNode(*outTemp_it);
+      auto outTempList = (*(this->out_))[*node_it];
+      for (auto it_out : Subtract(outTempList, uses)->GetList()) {
+        INodePtr outNode = GetNode(it_out);
         if (dstNode != outNode) {
           this->live_graph_.interf_graph->AddEdge(dstNode, outNode);
           this->live_graph_.interf_graph->AddEdge(outNode, dstNode);
@@ -225,6 +229,7 @@ void LiveGraphFactory::InterfGraph() {
       }
     }
   }
+  display(live_graph_, live_graph_.interf_graph->Nodes());
 }
 
 void LiveGraphFactory::Liveness() {

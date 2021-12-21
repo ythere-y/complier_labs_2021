@@ -42,7 +42,7 @@ void restoreCalleeRegs(assem::InstrList &instr_list) {
 void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   _frame = this->frame_;
   assem::InstrList *instrList = this->assem_instr_->GetInstrList();
-  // saveCalleeRegs(*instrList);
+  saveCalleeRegs(*instrList);
   // restore the frame size into a global register %rbx
   // NOTE: don't use %rbx in function body later!
 
@@ -58,7 +58,7 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
        stm_it++) {
     (*stm_it)->Munch(*instrList, fs_);
   }
-  // restoreCalleeRegs(*instrList);
+  restoreCalleeRegs(*instrList);
   frame::ProcEntryExit2(instrList);
 }
 
