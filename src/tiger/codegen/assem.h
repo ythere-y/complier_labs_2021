@@ -80,6 +80,8 @@ public:
     return instr_list_;
   }
 
+  void UpdateList(std::list<Instr *> newList) {instr_list_=newList;}
+
 private:
   std::list<Instr *> instr_list_;
 };

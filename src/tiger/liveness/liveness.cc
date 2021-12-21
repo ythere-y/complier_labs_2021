@@ -5,29 +5,30 @@ extern frame::RegManager *reg_manager;
 
 namespace live {
 
+static bool debug_flag = true;
+
 bool contains(temp::TempList *list, temp::Temp *temp) {
   std::list<temp::Temp *> tempList = list->GetList();
-  std::list<temp::Temp *>::iterator iter =
-      std::find(tempList.begin(), tempList.end(), temp);
-  return (iter != tempList.end());
+  for(auto it=tempList.begin(); it!=tempList.end(); it++) {
+    if((*it)->Int() == temp->Int()) {
+      return true;
+    }
+  }
+  return false;
+  // std::list<temp::Temp *>::iterator iter =
+  //     std::find(tempList.begin(), tempList.end(), temp);
+  // return (iter != tempList.end());
 }
 
 temp::TempList *Union(temp::TempList *lhs, temp::TempList *rhs) {
-  if (lhs == nullptr && rhs == nullptr)
-    return new temp::TempList();
-  else if (lhs == nullptr)
-    return rhs;
-  else if (rhs == nullptr)
-    return lhs;
-
   std::list<temp::Temp *> leftList = lhs->GetList();
   std::list<temp::Temp *> rightList = rhs->GetList();
   temp::TempList *result = new temp::TempList();
+
   for (auto ltemp_it = leftList.begin(); ltemp_it != leftList.end();
        ltemp_it++) {
     result->Append(*ltemp_it);
   }
-
   for (auto rtemp_it = rightList.begin(); rtemp_it != rightList.end();
        rtemp_it++) {
     if (!contains(lhs, *rtemp_it)) {
@@ -38,10 +39,6 @@ temp::TempList *Union(temp::TempList *lhs, temp::TempList *rhs) {
 }
 
 temp::TempList *Subtract(temp::TempList *lhs, temp::TempList *rhs) {
-  if (lhs == nullptr)
-    return new temp::TempList();
-  else if (rhs == nullptr)
-    return lhs;
   std::list<temp::Temp *> leftList = lhs->GetList();
   std::list<temp::Temp *> rightList = rhs->GetList();
   temp::TempList *result = new temp::TempList();
@@ -52,69 +49,6 @@ temp::TempList *Subtract(temp::TempList *lhs, temp::TempList *rhs) {
     }
   }
   return result;
-}
-bool equal(temp::TempList *lhs, temp::TempList *rhs) {
-  if (lhs == nullptr && rhs == nullptr)
-    return true;
-  else if (lhs == nullptr && rhs != nullptr)
-    return false;
-  else if (lhs != nullptr && rhs == nullptr)
-    return false;
-
-  auto get_lhs = lhs->GetList();
-  auto get_rhs = rhs->GetList();
-  if (get_lhs.size() != get_rhs.size())
-    return false;
-  std::set<int> inner;
-  for (auto it_right : get_rhs)
-    inner.insert(it_right->Int());
-  for (auto it_left : get_lhs) {
-    if (inner.find(it_left->Int()) == inner.end()) {
-      LLOG("something wrong\n");
-      return false;
-    }
-  }
-  return true;
-}
-bool equal(std::map<fg::FNodePtr, temp::TempList *> lhs,
-           std::map<fg::FNodePtr, temp::TempList *> rhs) {
-
-  LTAN;
-
-  if (lhs.size() != rhs.size()) {
-    return false;
-    // LTAN;
-  }
-  // LTAN;
-  for (const auto &item : lhs) {
-    if (rhs.find(item.first) == rhs.end()) {
-      return false;
-    }
-    // LTAN;
-    if (!equal(item.second, rhs[item.first])) {
-      // LTAN;
-      return false;
-    }
-  }
-  // LTAN;
-  return true;
-}
-
-bool Equal(temp::TempList *left, temp::TempList *right) {
-  if (left == nullptr && right == nullptr)
-    return true;
-  else if (left == nullptr && right != nullptr)
-    return false;
-  else if (left != nullptr && right == nullptr)
-    return false;
-
-  for (auto it_left : left->GetList())
-    if (!contains(right, it_left))
-      return false;
-  for (auto it_right : right->GetList())
-    if (!contains(left, it_right))
-      return false;
-  return true;
 }
 
 bool MoveList::Contain(INodePtr src, INodePtr dst) {
@@ -132,6 +66,7 @@ void MoveList::Delete(INodePtr src, INodePtr dst) {
       break;
     }
   }
+  assert(move_it!=move_list_.end());
   move_list_.erase(move_it);
 }
 
@@ -156,38 +91,78 @@ MoveList *MoveList::Intersect(MoveList *list) {
   return res;
 }
 
+bool TempListEqual(temp::TempList *lhs, temp::TempList *rhs) {
+  if (lhs == nullptr && rhs == nullptr)
+    return true;
+  else if (lhs == nullptr && rhs != nullptr)
+    return false;
+  else if (lhs != nullptr && rhs == nullptr)
+    return false;
+
+  auto get_lhs = lhs->GetList();
+  auto get_rhs = rhs->GetList();
+  if (get_lhs.size() != get_rhs.size())
+    return false;
+  for (auto it_left : get_lhs) {
+    if (!contains(rhs, it_left))
+      return false;
+  }
+  return true;
+}
+
+bool equal(std::map<fg::FNodePtr, temp::TempList *> lhs,
+           std::map<fg::FNodePtr, temp::TempList *> rhs) {
+
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+  for (const auto &item : lhs) {
+    if (rhs.find(item.first) == rhs.end()) {
+      return false;
+    }
+    if (!TempListEqual(item.second, rhs[item.first])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void LiveGraphFactory::LiveMap() {
   /* TODO: Put your lab6 code here */
-
   std::map<fg::FNodePtr, temp::TempList *> lastIn, lastOut;
   std::list<fg::FNodePtr> nodeList = this->flowgraph_->Nodes()->GetList();
 
-  bool fixedpoint = false;
-  while (!fixedpoint) {
-    fixedpoint = true;
-    lastIn = *(in_.get());
-    lastOut = *(this->out_.get());
-    int num_count = 1;
+  for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
+    if (!(*(this->out_))[*node_it]) {
+      (*(this->out_))[*node_it] = new temp::TempList();
+    }
+    if (!(*(this->in_))[*node_it]) {
+      (*(this->in_))[*node_it] = new temp::TempList();
+    }
+  }
+  while (true) {
+    lastIn = *(this->in_);
+    lastOut = *(this->out_);
+
     for (auto node_it = nodeList.rbegin(); node_it != nodeList.rend();
          node_it++) {
       temp::TempList *defs = (*node_it)->NodeInfo()->Def();
       temp::TempList *uses = (*node_it)->NodeInfo()->Use();
-      auto temp_in = Union(uses, Subtract((*(this->out_))[*node_it], defs));
-      auto temp_out = new temp::TempList();
 
-      auto old_in = (*(in_))[*node_it];
-      auto old_out = (*(out_))[*node_it];
-
+      (*(this->in_))[*node_it] =
+          Union(uses, Subtract((*(this->out_))[*node_it], defs));
+      // (*(this->out_))[*node_it] = nullptr;
+      // (*(this->out_))[*node_it] = new temp::TempList ();
       std::list<fg::FNodePtr> succList = (*node_it)->Succ()->GetList();
-      for (auto it_succ : (*node_it)->Succ()->GetList())
-        temp_out = Union(temp_out, (*(this->in_))[it_succ]);
-
-      (*(this->in_))[*node_it] = temp_in;
-      (*(this->out_))[*node_it] = temp_out;
-
-      if (!Equal(old_in, temp_in) || !Equal(old_out, temp_out)) {
-        fixedpoint = false;
+      for (auto succ_it = succList.begin(); succ_it != succList.end();
+           succ_it++) {
+        (*(this->out_))[*node_it] =
+            Union((*(this->out_))[*node_it], (*(this->in_))[*succ_it]);
       }
+    }
+
+    if (equal(lastIn, (*(this->in_))) && equal(lastOut, (*(this->out_)))) {
+      break;
     }
   }
 }
@@ -208,11 +183,12 @@ void LiveGraphFactory::InterfGraph() {
     }
   }
 
+
   std::list<fg::FNodePtr> nodeList = this->flowgraph_->Nodes()->GetList();
   for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
     temp::TempList *defs = (*node_it)->NodeInfo()->Def();
     temp::TempList *uses = (*node_it)->NodeInfo()->Use();
-    if (typeid(**node_it) == typeid(assem::MoveInstr) && defs && uses) {
+    if (typeid(**node_it) == typeid(assem::MoveInstr) && !defs->GetList().empty() && !uses->GetList().empty()) {
       // Move instruction would never have more than 1 src or dst
       INodePtr srcNode = GetNode(uses->NthTemp(0));
       INodePtr dstNode = GetNode(defs->NthTemp(0));
@@ -222,8 +198,8 @@ void LiveGraphFactory::InterfGraph() {
       for (auto outTemp_it = outTempList.begin();
            outTemp_it != outTempList.end(); outTemp_it++) {
         if (*outTemp_it == uses->NthTemp(0)) {
-          // for move instruction, there's no need to add conflict edges for
-          // src node
+          // for move instruction, there's no need to add conflict edges for src
+          // node
           continue;
         }
         INodePtr outNode = GetNode(*outTemp_it);
@@ -252,7 +228,13 @@ void LiveGraphFactory::InterfGraph() {
 }
 
 void LiveGraphFactory::Liveness() {
+  if (debug_flag) {
+    printf("LiveMap begin!\n");
+  }
   LiveMap();
+  if (debug_flag) {
+    printf("InterfGraph begin!\n");
+  }
   InterfGraph();
 }
 

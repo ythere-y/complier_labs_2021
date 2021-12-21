@@ -1,6 +1,7 @@
 #include "tiger/liveness/flowgraph.h"
 #include <map>
 
+extern frame::RegManager *reg_manager;
 namespace fg {
 
 void FlowGraphFactory::AssemFlowGraph() {
@@ -49,51 +50,69 @@ void FlowGraphFactory::AssemFlowGraph() {
 
 namespace assem {
 
+temp::TempList *filterRSP(temp::TempList *list) {
+  temp::TempList *retList = new temp::TempList();
+
+  std::list<temp::Temp *> tempList = list->GetList();
+
+  for(auto it=tempList.begin(); it!=tempList.end(); it++) {
+    if((*it)->Int() == reg_manager->StackPointer()->Int()){
+      continue;
+    } else {
+      retList->Append(*it);
+    }
+  }
+  return retList;
+}
+
 temp::TempList *LabelInstr::Def() const {
   /* TODO: Put your lab6 code here */
-  FLOG("label-def\n");
+  // return nullptr;
   return new temp::TempList();
 }
 
 temp::TempList *MoveInstr::Def() const {
   /* TODO: Put your lab6 code here */
-  FLOG("move-def\n");
-  if (dst_ == nullptr)
+  // return this->dst_;  // \Δ should I filter the %rsp ?
+  if (!this->dst_) {
     return new temp::TempList();
-  return this->dst_;
+  } else {
+    return filterRSP(this->dst_);
+  }
 }
 
 temp::TempList *OperInstr::Def() const {
   /* TODO: Put your lab6 code here */
-  FLOG("oper-def\n");
-  if (dst_ == nullptr)
+  if (!this->dst_) {
     return new temp::TempList();
-  return this->dst_;
+  } else {
+    return filterRSP(this->dst_);
+  }
 }
 
 temp::TempList *LabelInstr::Use() const {
   /* TODO: Put your lab6 code here */
-  FLOG("label-use\n");
+  // return nullptr;
   return new temp::TempList();
 }
 
 temp::TempList *MoveInstr::Use() const {
   /* TODO: Put your lab6 code here */
-  FLOG("move-use\n");
-  if (this->src_ == nullptr) {
-    FLOG("it's null\n");
-  }
-
-  if (src_ == nullptr)
+  // return this->src_;
+  if (!this->src_) {
     return new temp::TempList();
-  return this->src_;
+  } else {
+    return filterRSP(this->src_);
+  }
 }
 
 temp::TempList *OperInstr::Use() const {
   /* TODO: Put your lab6 code here */
-  FLOG("oper-use\n");
-  if (src_ == nullptr)
+  // return this->src_;
+  if (!this->src_) {
     return new temp::TempList();
-  return this->src_;
+  } else {
+    return filterRSP(this->src_);
+  }
 }
 } // namespace assem

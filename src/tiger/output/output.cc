@@ -37,6 +37,8 @@ void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
   if (phase != Proc)
     return;
 
+  
+
   TigerLog("-------====IR tree=====-----\n");
   TigerLog(body_);
 
@@ -63,8 +65,7 @@ void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
     traces = canon.TransferTraces();
   }
 
-  temp::Map *color =
-      temp::Map::LayerMap(reg_manager->temp_map_, temp::Map::Name());
+  temp::Map *color = temp::Map::LayerMap(reg_manager->temp_map_, temp::Map::Name());
   {
     // Lab 5: code generation
     TigerLog("-------====Code generate=====-----\n");
@@ -75,12 +76,19 @@ void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
   }
 
   assem::InstrList *il = assem_instr.get()->GetInstrList();
-
+  
   if (need_ra) {
     // Lab 6: register allocation
+
+    // ΔΔ todo: uncomment the following lines.
     TigerLog("----====Register allocate====-----\n");
     ra::RegAllocator reg_allocator(frame_, std::move(assem_instr));
+
+    TigerLog("allocate Begin!\n");
+
     reg_allocator.RegAlloc();
+
+    TigerLog("allocate End!\n");
     allocation = reg_allocator.TransferResult();
     il = allocation->il_;
     color = temp::Map::LayerMap(reg_manager->temp_map_, allocation->coloring_);
@@ -90,7 +98,7 @@ void ProcFrag::OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const {
            frame_->name_->Name().data());
 
   assem::Proc *proc = frame::ProcEntryExit3(frame_, il);
-
+  
   std::string proc_name = frame_->GetLabel()->Name();
 
   fprintf(out, ".globl %s\n", proc_name.data());

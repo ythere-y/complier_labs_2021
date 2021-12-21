@@ -17,7 +17,8 @@ public:
   static Frame *newFrame(temp::Label *name, std::vector<bool> *boolList);
   static tree::Exp *exp(frame::Access *access, tree::Exp *framePtr);
   static tree::Exp *externalCall(const std::string &s, tree::ExpList *args);
-  static const int K = 14;
+  static const int K = 15;
+  // static const int K = 14;   //Δ not sure if this will address the %rbx problem
 };
 
 class X64RegManager : public RegManager {
@@ -27,31 +28,30 @@ public:
 
   ~X64RegManager();
 
-  temp::TempList *Registers() { return _registers; }
+  temp::TempList *Registers() {return _registers;}
 
-  temp::TempList *ArgRegs() { return _argRegs; }
+  temp::TempList *ArgRegs() {return _argRegs;}
 
-  temp::TempList *CallerSaves() { return _callerSaves; }
+  temp::TempList *CallerSaves() {return _callerSaves;}
 
-  temp::TempList *CalleeSaves() { return _calleeSaves; }
+  temp::TempList *CalleeSaves() {return _calleeSaves;}
 
-  temp::TempList *ReturnSink() { return _returnSink; }
+  temp::TempList *ReturnSink() {return _returnSink;}
 
-  int WordSize() { return 8; }
-  int RegNum() { return 14; }
+  int WordSize() {return 8;}
 
-  temp::Temp *FramePointer() { return regs_[6]; }
+  temp::Temp *FramePointer() {return regs_[6];}
 
-  temp::Temp *StackPointer() { return regs_[7]; }
+  temp::Temp *StackPointer() {return regs_[7];}
 
-  temp::Temp *ReturnValue() { return regs_[0]; }
+  temp::Temp *ReturnValue() {return regs_[0];}
 
 private:
-  temp::TempList *_registers;
-  temp::TempList *_argRegs;
-  temp::TempList *_callerSaves;
-  temp::TempList *_calleeSaves;
-  temp::TempList *_returnSink;
+  temp::TempList * _registers;
+  temp::TempList * _argRegs;
+  temp::TempList * _callerSaves;
+  temp::TempList * _calleeSaves;
+  temp::TempList * _returnSink;
 };
 
 } // namespace frame

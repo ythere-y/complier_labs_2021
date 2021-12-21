@@ -127,8 +127,11 @@ X64RegManager::X64RegManager() {
     temp_map_->Enter(regs_[i], name);
   }
 
-  _registers = new temp::TempList({regs_[0], regs_[1], regs_[2], regs_[3],
-                                   regs_[5], regs_[6], regs_[7], regs_[8],
+  // %rbs was used to store the frame size, so will no be return as general register.
+  _registers = new temp::TempList({regs_[0], 
+                                    regs_[1], 
+                                    regs_[2], regs_[3],
+                                   regs_[4], regs_[5], regs_[6], regs_[8],
                                    regs_[9], regs_[10], regs_[11], regs_[12],
                                    regs_[13], regs_[14], regs_[15]});
 
@@ -166,7 +169,6 @@ tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
   return result;
 }
 
-//Δ why can this function indicate that these registers are "active"?
 void ProcEntryExit2(assem::InstrList *body) { 
   body->Append(
       new assem::OperInstr("", reg_manager->ReturnSink(), nullptr, nullptr));

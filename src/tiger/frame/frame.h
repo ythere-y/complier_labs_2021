@@ -5,9 +5,10 @@
 #include <memory>
 #include <string>
 
-#include "tiger/codegen/assem.h"
 #include "tiger/frame/temp.h"
 #include "tiger/translate/tree.h"
+#include "tiger/codegen/assem.h"
+
 
 namespace frame {
 
@@ -18,7 +19,7 @@ public:
   temp::Temp *GetRegister(int regno) { return regs_[regno]; }
 
   /**
-   * Get general-purpose registers except RSI
+   * Get general-purpose registers except RSP
    * NOTE: returned temp list should be in the order of calling convention
    * @return general-purpose registers
    */
@@ -55,8 +56,6 @@ public:
    * Get word size
    */
   [[nodiscard]] virtual int WordSize() = 0;
-  [[nodiscard]] virtual int RegNum() = 0;
-  // [[nodiscard]] virtual std::vector<std::string> Colors() = 0;
 
   [[nodiscard]] virtual temp::Temp *FramePointer() = 0;
 
@@ -65,7 +64,6 @@ public:
   [[nodiscard]] virtual temp::Temp *ReturnValue() = 0;
 
   temp::Map *temp_map_;
-
 protected:
   std::vector<temp::Temp *> regs_;
 };
@@ -73,23 +71,26 @@ protected:
 class Access {
 public:
   /* TODO: Put your lab5 code here */
-
+  
   virtual ~Access() = default;
 };
 
 class Frame {
   /* TODO: Put your lab5 code here */
 public:
-  temp::Label *name_;
-  std::list<Access *> formals;
-  std::list<Access *> locals;
-  tree::StmList *viewShift;
+  temp::Label *name_; 
+  std::list<Access*> formals;
+  std::list<Access*> locals;
+  tree::StmList *viewShift; 
   int offset;
   int frame_size_;
-  std::list<Access *> GetFormals() { return formals; }
-
+  std::list<Access*> GetFormals() {
+    return formals;
+  }
+  
   virtual temp::Label *GetLabel() = 0;
   virtual Access *allocLocal(bool escape) = 0;
+
 };
 
 /**
@@ -109,8 +110,7 @@ public:
    *Generate assembly for main program
    * @param out FILE object for output assembly file
    */
-  virtual void OutputAssem(FILE *out, OutputPhase phase,
-                           bool need_ra) const = 0;
+  virtual void OutputAssem(FILE *out, OutputPhase phase, bool need_ra) const = 0;
 };
 
 class StringFrag : public Frag {
@@ -138,10 +138,10 @@ class Frags {
 public:
   Frags() = default;
   void PushBack(Frag *frag) { frags_.emplace_back(frag); }
-  const std::list<Frag *> &GetList() { return frags_; }
+  const std::list<Frag*> &GetList() { return frags_; }
 
 private:
-  std::list<Frag *> frags_;
+  std::list<Frag*> frags_;
 };
 
 /* TODO: Put your lab5 code here */
@@ -150,6 +150,7 @@ tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm);
 void ProcEntryExit2(assem::InstrList *body);
 
 assem::Proc *ProcEntryExit3(frame::Frame *frame, assem::InstrList *body);
+
 
 } // namespace frame
 

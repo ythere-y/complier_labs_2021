@@ -11,24 +11,6 @@
 #include <map>
 #include <set>
 
-#define DEBUG
-
-#ifdef DEBUG
-#define RLOG(format, args...)                                                  \
-  do {                                                                         \
-    FILE *debug_log = fopen("register.log", "a+");                             \
-    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
-    fprintf(debug_log, format, ##args);                                        \
-    fclose(debug_log);                                                         \
-  } while (0)
-#else
-#define RLOG(format, args...)                                                  \
-  do {                                                                         \
-  } while (0)
-#endif
-
-#define TAN RLOG("get here\n")
-
 namespace ra {
 
 class Result {
@@ -52,6 +34,8 @@ public:
   RegAllocator(frame::Frame *frame, std::unique_ptr<cg::AssemInstr> assemInstr)
       : frame_(frame), assemInstr_(std::move(assemInstr)),
         result_(std::make_unique<Result>()) {
+
+    // initial = live_graph_->interf_graph->Nodes()->GetList();
     workListMoves = new live::MoveList();
     activeMoves = new live::MoveList();
     coalescedMoves = new live::MoveList();
@@ -99,6 +83,8 @@ private:
   std::unique_ptr<cg::AssemInstr> assemInstr_;
   std::unique_ptr<Result> result_;
 
+  // std::list<live::INodePtr> initial;
+
   std::set<live::INodePtr> simplifyWorkList;
   std::set<live::INodePtr> freezeWorkList;
   std::set<live::INodePtr> spillWorkList;
@@ -109,7 +95,7 @@ private:
   std::set<live::INodePtr> spilledNodes;
   std::set<live::INodePtr> coloredNodes;
 
-  std::map<live::INodePtr, live::MoveList *> moveListMap;
+  std::map<live::INodePtr, live::MoveList *> moveList;
 
   std::set<std::pair<live::INodePtr, live::INodePtr>> adjSet;
   std::map<live::INodePtr, std::set<live::INodePtr>> adjList;
