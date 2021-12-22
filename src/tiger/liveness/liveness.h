@@ -10,13 +10,13 @@
 #include <set>
 
 namespace live {
-
 using INode = graph::Node<temp::Temp>;
 using INodePtr = graph::Node<temp::Temp> *;
 using INodeList = graph::NodeList<temp::Temp>;
 using INodeListPtr = graph::NodeList<temp::Temp> *;
 using IGraph = graph::Graph<temp::Temp>;
 using IGraphPtr = graph::Graph<temp::Temp> *;
+
 #define DEBUG
 #ifdef DEBUG
 #define LOG(format, args...)                                                   \
@@ -61,12 +61,17 @@ struct LiveGraph {
       : interf_graph(interf_graph), moves(moves) {}
 };
 
+static void display(LiveGraph live_graph, INodeListPtr list);
+static void display(LiveGraph live_graph);
+
 class LiveGraphFactory {
 public:
   explicit LiveGraphFactory(fg::FGraphPtr flowgraph)
       : flowgraph_(flowgraph), live_graph_(new IGraph(), new MoveList()),
-        // in_(std::make_unique<graph::Table<assem::Instr, temp::TempList>>()),
-        // out_(std::make_unique<graph::Table<assem::Instr, temp::TempList>>()),
+        // in_(std::make_unique<graph::Table<assem::Instr,
+        // temp::TempList>>()),
+        // out_(std::make_unique<graph::Table<assem::Instr,
+        // temp::TempList>>()),
         in_(std::make_unique<std::map<fg::FNodePtr, temp::TempList *>>()),
         out_(std::make_unique<std::map<fg::FNodePtr, temp::TempList *>>()),
         temp_node_map_(new tab::Table<temp::Temp, INode>()) {}

@@ -20,10 +20,21 @@
   } while (0)
 #endif
 
+#define CLEAR_LOG                                                              \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "w");                              \
+    fprintf(debug_log, "\n");                                                  \
+    fclose(debug_log);                                                         \
+    FILE *graph_log = fopen("graph.out", "w");                                 \
+    fprintf(graph_log, "\n");                                                  \
+    fclose(graph_log);                                                         \
+  } while (0)
+
 frame::RegManager *reg_manager;
 frame::Frags *frags;
 
 int main(int argc, char **argv) {
+  CLEAR_LOG;
   std::string_view fname;
   std::unique_ptr<absyn::AbsynTree> absyn_tree;
   reg_manager = new frame::X64RegManager();

@@ -11,7 +11,32 @@
 #include <map>
 #include <set>
 
+#define RDEBUG
+#ifdef RDEBUG
+#define RLOG(format, args...)                                                  \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "a+");                             \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+#define R_ONELONGLOG(format, args...)                                          \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "a+");                             \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+#else
+#define RLOG(format, args...)                                                  \
+  do {                                                                         \
+  } while (0)
+#define R_ONELINELOG(format, args...)                                          \
+  do {                                                                         \
+  } while (0)
+#endif
 namespace ra {
+
+template <typename T> using Table = graph::Table<temp::Temp, T>;
 
 class Result {
 public:
@@ -95,11 +120,11 @@ private:
   std::set<live::INodePtr> spilledNodes;
   std::set<live::INodePtr> coloredNodes;
 
+  std::map<live::INodePtr, int> degree;
   std::map<live::INodePtr, live::MoveList *> moveList;
 
   std::set<std::pair<live::INodePtr, live::INodePtr>> adjSet;
   std::map<live::INodePtr, std::set<live::INodePtr>> adjList;
-  std::map<live::INodePtr, int> degree;
 
   std::map<live::INodePtr, live::INodePtr> alias;
 

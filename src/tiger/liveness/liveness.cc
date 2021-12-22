@@ -22,11 +22,17 @@ bool contains(temp::TempList *list, temp::Temp *temp) {
 
 void show_info(temp::Temp *out) {}
 
-void display(LiveGraph live_graph, INodeListPtr list) {
+static void display(LiveGraph live_graph, INodeListPtr list) {
   LOG("ready to diplay\n");
   FILE *test_out = fopen("graph.out", "a+");
+  // auto test = list->GetList().begin();
+  // (*test)->NodeInfo()->Int();
+
   live_graph.interf_graph->Show(test_out, list);
   fclose(test_out);
+}
+static void display(LiveGraph live_graph) {
+  display(live_graph, live_graph.interf_graph->Nodes());
 }
 
 temp::TempList *Union(temp::TempList *lhs, temp::TempList *rhs) {
@@ -191,20 +197,28 @@ void LiveGraphFactory::InterfGraph() {
       }
     }
   }
-  display(live_graph_, live_graph_.interf_graph->Nodes());
+  // display(live_graph_, live_graph_.interf_graph->Nodes());
 
   std::list<fg::FNodePtr> nodeList = this->flowgraph_->Nodes()->GetList();
+  int move_count = 0;
   for (auto node_it = nodeList.rbegin(); node_it != nodeList.rend();
        node_it++) {
     temp::TempList *defs = (*node_it)->NodeInfo()->Def();
     temp::TempList *uses = (*node_it)->NodeInfo()->Use();
-    if (typeid(**node_it) == typeid(assem::MoveInstr) &&
+    if (typeid(*((*node_it)->NodeInfo())) == typeid(assem::MoveInstr)) {
+      move_count++;
+    }
+
+    if (typeid(*((*node_it)->NodeInfo())) == typeid(assem::MoveInstr) &&
         !defs->GetList().empty() && !uses->GetList().empty()) {
       // Move instruction would never have more than 1 src or dst
       INodePtr srcNode = GetNode(uses->NthTemp(0));
       INodePtr dstNode = GetNode(defs->NthTemp(0));
       this->live_graph_.moves->Prepend(srcNode, dstNode);
       auto outTempList = (*(this->out_))[*node_it];
+      LOG("get a move [%d -> %d]\n", (*(defs->GetList().begin()))->Int(),
+          (*(uses->GetList().begin()))->Int());
+
       for (auto it_out : Subtract(outTempList, uses)->GetList()) {
         INodePtr outNode = GetNode(it_out);
         if (dstNode != outNode) {
@@ -229,6 +243,7 @@ void LiveGraphFactory::InterfGraph() {
       }
     }
   }
+  LOG("in total move count [count = %d]\n", move_count);
   display(live_graph_, live_graph_.interf_graph->Nodes());
 }
 

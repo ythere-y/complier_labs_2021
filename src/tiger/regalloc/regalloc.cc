@@ -8,6 +8,16 @@ extern frame::RegManager *reg_manager;
 namespace ra {
 /* TODO: Put your lab6 code here */
 
+// static void display(live::LiveGraph live_graph, live::INodeListPtr list) {
+//   LOG("ready to diplay\n");
+//   FILE *test_out = fopen("graph.out", "a+");
+//   // auto test = list->GetList().begin();
+//   // (*test)->NodeInfo()->Int();
+
+//   live_graph.interf_graph->Show(test_out, list);
+//   fclose(test_out);
+// }
+
 static bool test_mode = true;
 
 void RegAllocator::RegAlloc() {
@@ -21,13 +31,11 @@ void RegAllocator::RegAlloc() {
 
   live_graph_ = new live::LiveGraph(live_graph_factory.GetLiveGraph());
 
-  if (test_mode) {
-    printf("Build begin!\n");
-  }
+  // display(live_graph_, live_graph_->interf_graph->Nodes());
+
+  RLOG("Build begin\n");
   Build();
-  if (test_mode) {
-    printf("MakeWorkList begin!\n");
-  }
+  RLOG("Build finish\n");
 
   MakeWorkList();
   if (test_mode) {
@@ -35,72 +43,45 @@ void RegAllocator::RegAlloc() {
   }
   do {
     if (!simplifyWorkList.empty()) {
-      if (test_mode) {
-        printf("Simplify begin!\n");
-      }
+      RLOG("Simplify begin\n");
       Simplify();
-      if (test_mode) {
-        printf("Simplify end!\n");
-      }
+      RLOG("Simplify finish\n");
     } else if (!workListMoves->GetList().empty()) {
-      if (test_mode) {
-        printf("Coalesce begin!\n");
-      }
+      RLOG("Coalesce begin\n");
       Coalesce();
-      if (test_mode) {
-        printf("Coalesce end!\n");
-      }
+      RLOG("Coalesce begin\n");
     } else if (!freezeWorkList.empty()) {
-      if (test_mode) {
-        printf("Freeze begin!\n");
-      }
+      RLOG("Freeze begin\n");
       Freeze();
-      if (test_mode) {
-        printf("Freeze end!\n");
-      }
+      RLOG("Freeze begin\n");
     } else if (!spillWorkList.empty()) {
-      if (test_mode) {
-        printf("SelectSpill begin!\n");
-      }
       SelectSpill();
-      if (test_mode) {
-        printf("SelectSpill end!\n");
-      }
     }
   } while (!simplifyWorkList.empty() || !workListMoves->GetList().empty() ||
            !freezeWorkList.empty() || !spillWorkList.empty());
-  if (test_mode) {
-    printf("AssignColors begin!\n");
-  }
   AssignColors();
   if (!spilledNodes.empty()) {
-    if (test_mode) {
-      printf("RewriteProgram begin!\n");
-    }
     RewriteProgram();
     RegAlloc();
   } else {
     result_->coloring_ = coloring;
-    if (test_mode) {
-      printf("RemoveUnnecessary begin!\n");
-    }
     // this->assemInstr_->GetInstrList()
     result_->il_ = RemoveUnnecessary();
-    if (test_mode) {
-      printf("RegAlloc finished!!!\n");
-    }
   }
 }
 
 bool RegAllocator::precolored(temp::Temp *temp) {
-  std::list<temp::Temp *> regs = reg_manager->Registers()->GetList();
-  return std::find(regs.begin(), regs.end(), temp) != regs.end();
+  auto regs = reg_manager->Registers()->GetList();
+  auto fi = std::find(regs.begin(), regs.end(), temp);
+  if (fi != regs.end()) {
+    return true;
+  } else
+    return false;
 }
 
 void RegAllocator::AddEdge(live::INodePtr u, live::INodePtr v) {
-  if (adjSet.find(std::make_pair(u, v)) == adjSet.end()
-       && u->Key() != v->Key() 
-  ) {
+  if (adjSet.find(std::make_pair(u, v)) == adjSet.end() &&
+      u->Key() != v->Key()) {
     adjSet.insert(std::make_pair(u, v));
     adjSet.insert(std::make_pair(v, u));
     if (!precolored((u)->NodeInfo())) {
@@ -116,9 +97,12 @@ void RegAllocator::AddEdge(live::INodePtr u, live::INodePtr v) {
 
 //Δ quite different from text book
 void RegAllocator::Build() {
+
   std::list<std::pair<live::INodePtr, live::INodePtr>> _moveList =
       live_graph_->moves->GetList();
-  for (auto move_it = _moveList.begin(); move_it != _moveList.end(); move_it++) {
+  // 遍历所有move，记录记录每一条move，存在map中，方便用点来找到所有的move
+  for (auto move_it = _moveList.begin(); move_it != _moveList.end();
+       move_it++) {
     if (moveList.find((*move_it).first) == moveList.end()) {
       moveList[(*move_it).first] = new live::MoveList();
     }
@@ -129,10 +113,11 @@ void RegAllocator::Build() {
     moveList[(*move_it).second]->Append((*move_it).first, (*move_it).second);
   }
 
-  workListMoves = this->live_graph_->moves; //Δ
+  workListMoves = this->live_graph_->moves; // 存储所有的move操作的list
 
   std::list<live::INodePtr> interf_graph_nodeList =
       live_graph_->interf_graph->Nodes()->GetList();
+  // 遍历所有的结点，根据关系建立冲突图
   for (auto node_it = interf_graph_nodeList.begin();
        node_it != interf_graph_nodeList.end(); node_it++) {
     std::list<live::INodePtr> adjNodeList = (*node_it)->Adj()->GetList();
@@ -143,9 +128,9 @@ void RegAllocator::Build() {
   }
 
   temp::TempList *regList = reg_manager->Registers();
-
   for (int i = 0; i < frame::X64Frame::K; i++) {
     temp::Temp *ithRegister = regList->NthTemp(i);
+    std::string *color = new std::string;
     coloring->Enter(ithRegister, reg_manager->temp_map_->Look(ithRegister));
   }
 
@@ -161,7 +146,7 @@ bool RegAllocator::MoveRelated(live::INodePtr node) {
 }
 
 void RegAllocator::MakeWorkList() {
-  std::list<live::INodePtr> interf_nodes = 
+  std::list<live::INodePtr> interf_nodes =
       live_graph_->interf_graph->Nodes()->GetList();
   for (auto node_it = interf_nodes.begin(); node_it != interf_nodes.end();
        node_it++) {
@@ -177,6 +162,9 @@ void RegAllocator::MakeWorkList() {
       simplifyWorkList.insert(*node_it);
     }
   }
+  RLOG("spill work list [size = %d]\n", spillWorkList.size());
+  RLOG("freeze work list [size = %d]\n", freezeWorkList.size());
+  RLOG("simple work list [size = %d]\n", simplifyWorkList.size());
 }
 
 void RegAllocator::EnableMove(live::INodeListPtr nodes) {
@@ -209,9 +197,11 @@ live::INodeListPtr RegAllocator::Adjacent(live::INodePtr node) {
 }
 
 void RegAllocator::DecrementDegree(live::INodePtr node) {
-  if (precolored(node->NodeInfo())) {
-    return;
-  }
+  // 如果是已经着色的，那么直接返回？
+  // if (precolored(node->NodeInfo())) {
+  //   return;
+  // }
+
   int d = degree[node];
   degree[node] = d - 1;
   if (d == frame::X64Frame::K) {
@@ -229,20 +219,31 @@ void RegAllocator::DecrementDegree(live::INodePtr node) {
 
 void RegAllocator::Simplify() {
   live::INodePtr node = *(simplifyWorkList.begin());
-  simplifyWorkList.erase(node);
+  auto cho_node = simplifyWorkList.begin();
+  int sim_size = simplifyWorkList.size();
+  int sel_size = selectStack.size();
+  int no_num = node->NodeInfo()->Int();
+  RLOG("[num = %d] sim [size = %d -> %d]__ sel [size = %d -> %d]\n", no_num,
+       sim_size, sim_size - 1, sel_size, sel_size + 1);
+  simplifyWorkList.erase(cho_node);
+
   selectStack.push_back(node);
+
   //Δ not same with textbook
-  
+
   // this version
   // std::list<live::INodePtr> adjNodeList = node->Adj()->GetList();
-  
+
   // textbook version
   std::list<live::INodePtr> adjNodeList = Adjacent(node)->GetList();
-
+  R_ONELONGLOG("neighbor node info :");
   for (auto adj_node_it = adjNodeList.begin(); adj_node_it != adjNodeList.end();
        adj_node_it++) {
+    R_ONELONGLOG("%d(%d), ", (*adj_node_it)->NodeInfo()->Int(),
+                 degree[(*adj_node_it)] - 1);
     DecrementDegree(*adj_node_it);
   }
+  R_ONELONGLOG("\n");
 }
 
 live::INodePtr RegAllocator::GetAlias(live::INodePtr node) {
@@ -291,7 +292,6 @@ void RegAllocator::Combine(live::INodePtr u, live::INodePtr v) {
   EnableMove(nodeList);
 
   std::list<live::INodePtr> adjList = Adjacent(v)->GetList();
-
   for (auto adj_it = adjList.begin(); adj_it != adjList.end(); adj_it++) {
     AddEdge(*adj_it, u);
     DecrementDegree(*adj_it);
@@ -323,10 +323,9 @@ bool RegAllocator::OK_forAll(live::INodeListPtr nodes, live::INodePtr r) {
 }
 
 void RegAllocator::Coalesce() {
-  live::INodePtr x = workListMoves->GetList().begin()->first;
-  live::INodePtr y = workListMoves->GetList().begin()->second;
+  live::INodePtr x = workListMoves->GetList().begin()->first;  // src
+  live::INodePtr y = workListMoves->GetList().begin()->second; // dst
   live::INodePtr u, v;
-  workListMoves->Delete(x, y);
 
   // workListMoves->GetList().erase(workListMoves->GetList().begin());
 
@@ -340,20 +339,19 @@ void RegAllocator::Coalesce() {
     u = x;
     v = y;
   }
-
-
+  workListMoves->Delete(x, y);
   if (u == v) {
     coalescedMoves->Append(x, y);
     AddWorkList(u);
   } else if (precolored(v->NodeInfo()) ||
              adjSet.find(std::make_pair(u, v)) != adjSet.end()) {
-    if(!constrainedMoves->Contain(x, y))
+    if (!constrainedMoves->Contain(x, y))
       constrainedMoves->Append(x, y);
     AddWorkList(u);
     AddWorkList(v);
   } else {
     live::INodeListPtr adjNodes = Adjacent(u);
-    
+
     //Δ not same with textbook
     // this version
     // adjNodes->CatList(Adjacent(v));
@@ -366,7 +364,7 @@ void RegAllocator::Coalesce() {
       Combine(u, v);
       AddWorkList(u);
     } else {
-      if(!activeMoves->Contain(x ,y))
+      if (!activeMoves->Contain(x, y))
         activeMoves->Append(x, y);
     }
   }
@@ -391,9 +389,9 @@ void RegAllocator::FreezeMoves(live::INodePtr u) {
       frozenMoves->Append(x, y);
 
     if (
-      //Δ different, the precolor condition is not from textbook but it is probably needed
-      !precolored(v->NodeInfo()) &&   
-      NodeMoves(v)->GetList().empty() &&
+        //Δ different, the precolor condition is not from textbook but it is
+        // probably needed
+        !precolored(v->NodeInfo()) && NodeMoves(v)->GetList().empty() &&
         degree[v] < frame::X64Frame::K) {
       freezeWorkList.erase(v);
       simplifyWorkList.insert(v);
@@ -474,42 +472,41 @@ void RegAllocator::RewriteProgram() {
 
   for (auto node : spilledNodes) {
     temp::Temp *spilledTemp = node->NodeInfo();
-    this->frame_->offset -= reg_manager->WordSize();    //Δ
+    this->frame_->offset -= reg_manager->WordSize(); //Δ
     std::list<assem::Instr *> instrList =
         this->assemInstr_->GetInstrList()->GetList();
 
-    if(!newInstrList.empty()) {
+    if (!newInstrList.empty()) {
       instrList = newInstrList;
       this->assemInstr_->GetInstrList()->UpdateList(newInstrList);
       newInstrList.clear();
     }
-    
+
     for (auto il_it = instrList.cbegin(); il_it != instrList.cend(); il_it++) {
       temp::TempList *src, *dst;
-      if(test_mode) {printf("get an instruction!\n"); }
       if (typeid(**il_it) == typeid(assem::LabelInstr)) {
-        src = new temp::TempList ();
-        dst = new temp::TempList ();
+        src = new temp::TempList();
+        dst = new temp::TempList();
       } else if (typeid(**il_it) == typeid(assem::MoveInstr)) {
         auto moveInstr = (assem::MoveInstr *)(*il_it);
-        if(!moveInstr->src_ || moveInstr->src_->GetList().empty()) {
+        if (!moveInstr->src_ || moveInstr->src_->GetList().empty()) {
           src = new temp::TempList();
         } else {
           src = moveInstr->src_;
         }
-        if(!moveInstr->dst_ || moveInstr->dst_->GetList().empty()) {
+        if (!moveInstr->dst_ || moveInstr->dst_->GetList().empty()) {
           dst = new temp::TempList();
         } else {
           dst = moveInstr->dst_;
         }
       } else if (typeid(**il_it) == typeid(assem::OperInstr)) {
         auto moveInstr = (assem::OperInstr *)(*il_it);
-        if(!moveInstr->src_ || moveInstr->src_->GetList().empty()) {
+        if (!moveInstr->src_ || moveInstr->src_->GetList().empty()) {
           src = new temp::TempList();
         } else {
           src = moveInstr->src_;
         }
-        if(!moveInstr->dst_ || moveInstr->dst_->GetList().empty()) {
+        if (!moveInstr->dst_ || moveInstr->dst_->GetList().empty()) {
           dst = new temp::TempList();
         } else {
           dst = moveInstr->dst_;
@@ -518,7 +515,6 @@ void RegAllocator::RewriteProgram() {
         assert(false);
       }
 
-      if(test_mode) {printf("get the src and dst\n"); }
       assert(src && dst);
       std::list<temp::Temp *> srcTempList = src->GetList();
       std::list<temp::Temp *> dstTempList = dst->GetList();
@@ -535,16 +531,15 @@ void RegAllocator::RewriteProgram() {
         stream << "movq (" << this->frame_->frame_size_ + this->frame_->offset
                << ")(`s0), `d0";
         std::string assem = stream.str();
-        if(test_mode) {printf("up and down - up\n"); }
         // this->assemInstr_->GetInstrList()->Insert(
         //     il_it,
         //     new assem::OperInstr(
         //         assem, new temp::TempList({newTemp}),
         //         new temp::TempList(reg_manager->StackPointer()), nullptr));
-        
+
         newInstrList.push_back(new assem::OperInstr(
-                assem, new temp::TempList({newTemp}),
-                new temp::TempList(reg_manager->StackPointer()), nullptr));
+            assem, new temp::TempList({newTemp}),
+            new temp::TempList(reg_manager->StackPointer()), nullptr));
 
         newInstrList.push_back(*il_it);
 
@@ -552,7 +547,6 @@ void RegAllocator::RewriteProgram() {
         stream << "movq `s0, ("
                << this->frame_->frame_size_ + this->frame_->offset << ")(`s1)";
         assem = stream.str();
-        if(test_mode) {printf("up and down - down\n"); }
         // this->assemInstr_->GetInstrList()->Insert(
         //     ++il_it,
         //     new assem::OperInstr(
@@ -560,12 +554,12 @@ void RegAllocator::RewriteProgram() {
         //         new temp::TempList({newTemp, reg_manager->StackPointer()}),
         //         nullptr));
         // --il_it;
-        newInstrList.push_back(new assem::OperInstr(assem, nullptr,
-                new temp::TempList({newTemp, reg_manager->StackPointer()}),
-                nullptr));
-        if(test_mode) {printf("up and down - finish\n"); }
+        newInstrList.push_back(new assem::OperInstr(
+            assem, nullptr,
+            new temp::TempList({newTemp, reg_manager->StackPointer()}),
+            nullptr));
       } else if (std::find(srcTempList.begin(), srcTempList.end(),
-                                  spilledTemp) != srcTempList.end()) {
+                           spilledTemp) != srcTempList.end()) {
         temp::Temp *newTemp = temp::TempFactory::NewTemp();
         noSpillTemp.insert(newTemp);
         src->Replace(spilledTemp, newTemp);
@@ -573,7 +567,6 @@ void RegAllocator::RewriteProgram() {
         stream << "movq (" << this->frame_->frame_size_ + this->frame_->offset
                << ")(`s0), `d0";
         std::string assem = stream.str();
-        if(test_mode) {printf("up\n"); }
         // this->assemInstr_->GetInstrList()->Insert(
         //     il_it,
         //     new assem::OperInstr(
@@ -581,11 +574,11 @@ void RegAllocator::RewriteProgram() {
         //         new temp::TempList(reg_manager->StackPointer()), nullptr));
 
         newInstrList.push_back(new assem::OperInstr(
-                assem, new temp::TempList({newTemp}),
-                new temp::TempList(reg_manager->StackPointer()), nullptr));
+            assem, new temp::TempList({newTemp}),
+            new temp::TempList(reg_manager->StackPointer()), nullptr));
         newInstrList.push_back(*il_it);
       } else if (std::find(dstTempList.begin(), dstTempList.end(),
-                                  spilledTemp) != dstTempList.end()) {
+                           spilledTemp) != dstTempList.end()) {
         temp::Temp *newTemp = temp::TempFactory::NewTemp();
         noSpillTemp.insert(newTemp);
         dst->Replace(spilledTemp, newTemp);
@@ -593,7 +586,6 @@ void RegAllocator::RewriteProgram() {
         stream << "movq `s0, ("
                << this->frame_->frame_size_ + this->frame_->offset << ")(`s1)";
         std::string assem = stream.str();
-        if(test_mode) {printf("down \n"); }
         // this->assemInstr_->GetInstrList()->Insert(
         //     ++il_it,
         //     new assem::OperInstr(
@@ -603,16 +595,18 @@ void RegAllocator::RewriteProgram() {
         // --il_it;
 
         newInstrList.push_back(*il_it);
-        newInstrList.push_back(new assem::OperInstr(assem, nullptr,
-                new temp::TempList({newTemp, reg_manager->StackPointer()}),
-                nullptr));
+        newInstrList.push_back(new assem::OperInstr(
+            assem, nullptr,
+            new temp::TempList({newTemp, reg_manager->StackPointer()}),
+            nullptr));
       } else {
-        if(test_mode) {printf("same \n"); }
         newInstrList.push_back(*il_it);
       }
     }
   }
-  if(test_mode) {printf("loop finish\n"); }
+  if (test_mode) {
+    printf("loop finish\n");
+  }
   spilledNodes.clear();
   coloredNodes.clear();
   coalescedNodes.clear();
@@ -628,7 +622,7 @@ assem::InstrList *RegAllocator::RemoveUnnecessary() {
       temp::Temp *src = moveInstr->src_->NthTemp(0),
                  *dst = moveInstr->dst_->NthTemp(0);
       if (!coloring->Look(src)->compare(*coloring->Look(dst))) {
-        continue;                                           
+        continue;
       }
     }
     newInstrList->Append(*il_it);
