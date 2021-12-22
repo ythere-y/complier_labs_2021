@@ -11,7 +11,7 @@ namespace ra {
 static void display(live::MoveList *movelist) {
   auto get_move = movelist->GetList();
 
-  list_out = fopen("list.log", "a+");
+  FILE *list_out = fopen("list.log", "a+");
   fprintf(list_out, "the move list is :\n--------------\n");
   for (auto it_move : get_move) {
     fprintf(list_out, " <%d,%d>\n", it_move.first->NodeInfo()->Int(),
@@ -80,6 +80,9 @@ void RegAllocator::RegAlloc() {
     RegAlloc();
   } else {
     result_->coloring_ = coloring;
+    FILE *mapout = fopen("map.log", "w");
+    coloring->DumpMap(mapout);
+    fclose(mapout);
     // this->assemInstr_->GetInstrList()
     result_->il_ = RemoveUnnecessary();
   }
@@ -154,7 +157,10 @@ void RegAllocator::Build() {
 }
 
 live::MoveList *RegAllocator::NodeMoves(live::INodePtr node) {
-  return moveList[node]->Intersect(activeMoves->Union(workListMoves));
+  if (moveList[node])
+    return moveList[node]->Intersect(activeMoves->Union(workListMoves));
+  else
+    return new live::MoveList();
 }
 
 bool RegAllocator::MoveRelated(live::INodePtr node) {
@@ -188,9 +194,9 @@ void RegAllocator::MakeWorkList() {
 
 void RegAllocator::EnableMove(live::INodeListPtr nodes) {
   std::list<live::INodePtr> nodeList = nodes->GetList();
-  for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
+  for (auto it_node : nodeList) {
     std::list<std::pair<live::INodePtr, live::INodePtr>> move_list =
-        NodeMoves(*node_it)->GetList();
+        NodeMoves(it_node)->GetList();
     for (auto move_it = move_list.begin(); move_it != move_list.end();
          move_it++) {
       if (!activeMoves->GetList().empty() &&
@@ -392,10 +398,8 @@ void RegAllocator::Coalesce() {
 }
 
 void RegAllocator::FreezeMoves(live::INodePtr u) {
-  RTAN;
   std::list<std::pair<live::INodePtr, live::INodePtr>> nodeList =
       NodeMoves(u)->GetList();
-  RTAN;
   for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
     live::INodePtr v;
     auto x = node_it->first;
@@ -405,18 +409,12 @@ void RegAllocator::FreezeMoves(live::INodePtr u) {
     } else {
       v = GetAlias(y);
     }
-    RTAN;
     if (activeMoves->Contain(x, y)) {
-      RTAN;
       activeMoves->Delete(x, y);
     }
-    RTAN;
 
-    RTAN;
     if (!frozenMoves->Contain(x, y)) {
-      RTAN;
       frozenMoves->Append(x, y);
-      RTAN;
     }
 
     if (
@@ -424,11 +422,8 @@ void RegAllocator::FreezeMoves(live::INodePtr u) {
         // probably needed
         !precolored(v->NodeInfo()) && NodeMoves(v)->GetList().empty() &&
         degree[v] < frame::X64Frame::K) {
-      RTAN;
       freezeWorkList.erase(v);
-      RTAN;
       simplifyWorkList.insert(v);
-      RTAN;
     }
   }
 }
@@ -441,38 +436,27 @@ void RegAllocator::Freeze() {
 }
 
 void RegAllocator::SelectSpill() {
-  RTAN;
   live::INodePtr chosen = nullptr;
-  RTAN;
   double chosen_priority = 1E20;
-  RTAN;
   for (auto node : spillWorkList) {
 
     // Δ noSpillTemp is not in textbook
-    RTAN;
     if (noSpillTemp.find(node->NodeInfo()) != noSpillTemp.end()) {
       continue;
     }
-    RTAN;
     chosen = node;
-    RTAN;
     break;
     // if (liveness.priority[node->NodeInfo()] < chosen_priority) {
     //   chosen = node;
     //   chosen_priority = liveness.priority[node->NodeInfo()];
     // }
   }
-  RTAN;
   if (!chosen) {
     chosen = *(spilledNodes.begin());
   }
-  RTAN;
   spillWorkList.erase(chosen);
-  RTAN;
   simplifyWorkList.insert(chosen);
-  RTAN;
   FreezeMoves(chosen);
-  RTAN;
 }
 
 void RegAllocator::AssignColors() {
@@ -514,6 +498,9 @@ void RegAllocator::AssignColors() {
 
 void RegAllocator::RewriteProgram() {
   std::list<assem::Instr *> newInstrList;
+  // FILE *inst_out = fopen("instr.log", "w");
+  // assemInstr_->GetInstrList()->Print(inst_out, reg_manager->temp_map_);
+  // fclose(inst_out);
 
   for (auto node : spilledNodes) {
     temp::Temp *spilledTemp = node->NodeInfo();
@@ -649,6 +636,12 @@ void RegAllocator::RewriteProgram() {
       }
     }
   }
+
+  // inst_out = fopen("instr.log", "a+");
+  // fprintf(inst_out, "\n\n  after :\n");
+  // assemInstr_->GetInstrList()->Print(inst_out, reg_manager->temp_map_);
+  // fclose(inst_out);
+
   spilledNodes.clear();
   coloredNodes.clear();
   coalescedNodes.clear();
