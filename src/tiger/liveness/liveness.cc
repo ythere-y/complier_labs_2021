@@ -24,7 +24,7 @@ void show_info(temp::Temp *out) {}
 
 static void display(LiveGraph live_graph, INodeListPtr list) {
   LOG("ready to diplay\n");
-  FILE *test_out = fopen("graph.out", "a+");
+  FILE *test_out = fopen("graph.log", "a+");
   // auto test = list->GetList().begin();
   // (*test)->NodeInfo()->Int();
 
@@ -214,7 +214,12 @@ void LiveGraphFactory::InterfGraph() {
       // Move instruction would never have more than 1 src or dst
       INodePtr srcNode = GetNode(uses->NthTemp(0));
       INodePtr dstNode = GetNode(defs->NthTemp(0));
-      this->live_graph_.moves->Prepend(srcNode, dstNode);
+      // 如果有一方为空，说明是常数移动，不计入可合并的移动操作
+      if (!uses->GetList().empty() && !defs->GetList().empty()) {
+        this->live_graph_.moves->Prepend(srcNode, dstNode);
+      } else {
+        LOG("*******************  alert there is a const move\n");
+      }
       auto outTempList = (*(this->out_))[*node_it];
       LOG("get a move [%d -> %d]\n", (*(defs->GetList().begin()))->Int(),
           (*(uses->GetList().begin()))->Int());

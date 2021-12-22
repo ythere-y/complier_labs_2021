@@ -26,6 +26,7 @@
     fprintf(debug_log, format, ##args);                                        \
     fclose(debug_log);                                                         \
   } while (0)
+
 #else
 #define RLOG(format, args...)                                                  \
   do {                                                                         \
@@ -34,6 +35,11 @@
   do {                                                                         \
   } while (0)
 #endif
+
+#define isNULL RLOG("it's null\n");
+#define notNULL RLOG("it's not null\n");
+#define RTAN RLOG("get here\n");
+
 namespace ra {
 
 template <typename T> using Table = graph::Table<temp::Temp, T>;
@@ -65,6 +71,7 @@ public:
     activeMoves = new live::MoveList();
     coalescedMoves = new live::MoveList();
     constrainedMoves = new live::MoveList();
+    frozenMoves = new live::MoveList();
     coloring = temp::Map::Empty();
   }
   ~RegAllocator() {
@@ -78,6 +85,7 @@ public:
   std::unique_ptr<Result> TransferResult() { return std::move(result_); }
 
 private:
+  void ShowStatus();
   void Build();
   void MakeWorkList();
   void Simplify();

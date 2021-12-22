@@ -25,9 +25,12 @@
     FILE *debug_log = fopen("register.log", "w");                              \
     fprintf(debug_log, "\n");                                                  \
     fclose(debug_log);                                                         \
-    FILE *graph_log = fopen("graph.out", "w");                                 \
+    FILE *graph_log = fopen("graph.log", "w");                                 \
     fprintf(graph_log, "\n");                                                  \
     fclose(graph_log);                                                         \
+    FILE *list_log = fopen("list.log", "w");                                   \
+    fprintf(list_log, "\n");                                                   \
+    fclose(list_log);                                                          \
   } while (0)
 
 frame::RegManager *reg_manager;

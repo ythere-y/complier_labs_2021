@@ -8,7 +8,21 @@ extern frame::RegManager *reg_manager;
 namespace ra {
 /* TODO: Put your lab6 code here */
 
-// static void display(live::LiveGraph live_graph, live::INodeListPtr list) {
+static void display(live::MoveList *movelist) {
+  auto get_move = movelist->GetList();
+
+  list_out = fopen("list.log", "a+");
+  fprintf(list_out, "the move list is :\n--------------\n");
+  for (auto it_move : get_move) {
+    fprintf(list_out, " <%d,%d>\n", it_move.first->NodeInfo()->Int(),
+            it_move.second->NodeInfo()->Int());
+  }
+  fprintf(list_out, "----------\n");
+  fclose(list_out);
+}
+
+// static void display(live::LiveGraph live_graph, live::INodeListPtr list)
+// {
 //   LOG("ready to diplay\n");
 //   FILE *test_out = fopen("graph.out", "a+");
 //   // auto test = list->GetList().begin();
@@ -17,8 +31,6 @@ namespace ra {
 //   live_graph.interf_graph->Show(test_out, list);
 //   fclose(test_out);
 // }
-
-static bool test_mode = true;
 
 void RegAllocator::RegAlloc() {
   fg::FlowGraphFactory flow_graph_factory(this->assemInstr_->GetInstrList());
@@ -38,10 +50,9 @@ void RegAllocator::RegAlloc() {
   RLOG("Build finish\n");
 
   MakeWorkList();
-  if (test_mode) {
-    printf("MakeWorkList end!\n");
-  }
+  RLOG("MakeWorkList finished !\n");
   do {
+    RLOG("one turn\n");
     if (!simplifyWorkList.empty()) {
       RLOG("Simplify begin\n");
       Simplify();
@@ -49,17 +60,21 @@ void RegAllocator::RegAlloc() {
     } else if (!workListMoves->GetList().empty()) {
       RLOG("Coalesce begin\n");
       Coalesce();
-      RLOG("Coalesce begin\n");
+      RLOG("Coalesce finish\n");
     } else if (!freezeWorkList.empty()) {
       RLOG("Freeze begin\n");
       Freeze();
-      RLOG("Freeze begin\n");
+      RLOG("Freeze finish\n");
     } else if (!spillWorkList.empty()) {
+      RLOG("Select begin\n");
       SelectSpill();
+      RLOG("Select finish\n");
     }
   } while (!simplifyWorkList.empty() || !workListMoves->GetList().empty() ||
            !freezeWorkList.empty() || !spillWorkList.empty());
+  RLOG("assign color begind\n");
   AssignColors();
+  RLOG("assign color finish\n");
   if (!spilledNodes.empty()) {
     RewriteProgram();
     RegAlloc();
@@ -114,6 +129,7 @@ void RegAllocator::Build() {
   }
 
   workListMoves = this->live_graph_->moves; // 存储所有的move操作的list
+  display(workListMoves);
 
   std::list<live::INodePtr> interf_graph_nodeList =
       live_graph_->interf_graph->Nodes()->GetList();
@@ -142,7 +158,10 @@ live::MoveList *RegAllocator::NodeMoves(live::INodePtr node) {
 }
 
 bool RegAllocator::MoveRelated(live::INodePtr node) {
-  return !NodeMoves(node)->GetList().empty();
+  if (!moveList[node])
+    return false;
+  else
+    return !NodeMoves(node)->GetList().empty();
 }
 
 void RegAllocator::MakeWorkList() {
@@ -328,6 +347,7 @@ void RegAllocator::Coalesce() {
   live::INodePtr u, v;
 
   // workListMoves->GetList().erase(workListMoves->GetList().begin());
+  workListMoves->Delete(x, y);
 
   x = GetAlias(x);
   y = GetAlias(y);
@@ -339,7 +359,6 @@ void RegAllocator::Coalesce() {
     u = x;
     v = y;
   }
-  workListMoves->Delete(x, y);
   if (u == v) {
     coalescedMoves->Append(x, y);
     AddWorkList(u);
@@ -360,6 +379,8 @@ void RegAllocator::Coalesce() {
     adjNodes->Union(Adjacent(v));
     if ((precolored(u->NodeInfo()) && OK_forAll(Adjacent(v), u)) ||
         (!precolored(u->NodeInfo()) && Conservative(adjNodes))) {
+      RLOG("coal : [x = %d, y = %d]\n", x->NodeInfo()->Int(),
+           y->NodeInfo()->Int());
       coalescedMoves->Append(x, y);
       Combine(u, v);
       AddWorkList(u);
@@ -371,8 +392,10 @@ void RegAllocator::Coalesce() {
 }
 
 void RegAllocator::FreezeMoves(live::INodePtr u) {
+  RTAN;
   std::list<std::pair<live::INodePtr, live::INodePtr>> nodeList =
       NodeMoves(u)->GetList();
+  RTAN;
   for (auto node_it = nodeList.begin(); node_it != nodeList.end(); node_it++) {
     live::INodePtr v;
     auto x = node_it->first;
@@ -382,19 +405,30 @@ void RegAllocator::FreezeMoves(live::INodePtr u) {
     } else {
       v = GetAlias(y);
     }
-    if (activeMoves->Contain(x, y))
+    RTAN;
+    if (activeMoves->Contain(x, y)) {
+      RTAN;
       activeMoves->Delete(x, y);
+    }
+    RTAN;
 
-    if (!frozenMoves->Contain(x, y))
+    RTAN;
+    if (!frozenMoves->Contain(x, y)) {
+      RTAN;
       frozenMoves->Append(x, y);
+      RTAN;
+    }
 
     if (
         //Δ different, the precolor condition is not from textbook but it is
         // probably needed
         !precolored(v->NodeInfo()) && NodeMoves(v)->GetList().empty() &&
         degree[v] < frame::X64Frame::K) {
+      RTAN;
       freezeWorkList.erase(v);
+      RTAN;
       simplifyWorkList.insert(v);
+      RTAN;
     }
   }
 }
@@ -407,27 +441,38 @@ void RegAllocator::Freeze() {
 }
 
 void RegAllocator::SelectSpill() {
+  RTAN;
   live::INodePtr chosen = nullptr;
+  RTAN;
   double chosen_priority = 1E20;
+  RTAN;
   for (auto node : spillWorkList) {
 
     // Δ noSpillTemp is not in textbook
+    RTAN;
     if (noSpillTemp.find(node->NodeInfo()) != noSpillTemp.end()) {
       continue;
     }
+    RTAN;
     chosen = node;
+    RTAN;
     break;
     // if (liveness.priority[node->NodeInfo()] < chosen_priority) {
     //   chosen = node;
     //   chosen_priority = liveness.priority[node->NodeInfo()];
     // }
   }
+  RTAN;
   if (!chosen) {
     chosen = *(spilledNodes.begin());
   }
+  RTAN;
   spillWorkList.erase(chosen);
+  RTAN;
   simplifyWorkList.insert(chosen);
+  RTAN;
   FreezeMoves(chosen);
+  RTAN;
 }
 
 void RegAllocator::AssignColors() {
@@ -603,9 +648,6 @@ void RegAllocator::RewriteProgram() {
         newInstrList.push_back(*il_it);
       }
     }
-  }
-  if (test_mode) {
-    printf("loop finish\n");
   }
   spilledNodes.clear();
   coloredNodes.clear();
