@@ -498,9 +498,12 @@ void RegAllocator::AssignColors() {
 
 void RegAllocator::RewriteProgram() {
   std::list<assem::Instr *> newInstrList;
-  // FILE *inst_out = fopen("instr.log", "w");
-  // assemInstr_->GetInstrList()->Print(inst_out, reg_manager->temp_map_);
-  // fclose(inst_out);
+  temp::Map *my_color =
+      temp::Map::LayerMap(reg_manager->temp_map_, temp::Map::Name());
+
+  FILE *inst_out = fopen("instr.log", "w");
+  assemInstr_->GetInstrList()->Print(inst_out, my_color);
+  fclose(inst_out);
 
   for (auto node : spilledNodes) {
     temp::Temp *spilledTemp = node->NodeInfo();
@@ -508,18 +511,12 @@ void RegAllocator::RewriteProgram() {
     std::list<assem::Instr *> instrList =
         this->assemInstr_->GetInstrList()->GetList();
 
-    if (!newInstrList.empty()) {
-      instrList = newInstrList;
-      this->assemInstr_->GetInstrList()->UpdateList(newInstrList);
-      newInstrList.clear();
-    }
-
     for (auto il_it = instrList.cbegin(); il_it != instrList.cend(); il_it++) {
       temp::TempList *src, *dst;
-      if (typeid(**il_it) == typeid(assem::LabelInstr)) {
+      if (typeid(*(*il_it)) == typeid(assem::LabelInstr)) {
         src = new temp::TempList();
         dst = new temp::TempList();
-      } else if (typeid(**il_it) == typeid(assem::MoveInstr)) {
+      } else if (typeid(*(*il_it)) == typeid(assem::MoveInstr)) {
         auto moveInstr = (assem::MoveInstr *)(*il_it);
         if (!moveInstr->src_ || moveInstr->src_->GetList().empty()) {
           src = new temp::TempList();
@@ -560,8 +557,8 @@ void RegAllocator::RewriteProgram() {
         src->Replace(spilledTemp, newTemp);
         dst->Replace(spilledTemp, newTemp);
         std::stringstream stream;
-        stream << "movq (" << this->frame_->frame_size_ + this->frame_->offset
-               << ")(`s0), `d0";
+        stream << "movq " << this->frame_->frame_size_ + this->frame_->offset
+               << "(`s0), `d0";
         std::string assem = stream.str();
         // this->assemInstr_->GetInstrList()->Insert(
         //     il_it,
@@ -576,8 +573,8 @@ void RegAllocator::RewriteProgram() {
         newInstrList.push_back(*il_it);
 
         stream.str(0);
-        stream << "movq `s0, ("
-               << this->frame_->frame_size_ + this->frame_->offset << ")(`s1)";
+        stream << "movq `s0, "
+               << this->frame_->frame_size_ + this->frame_->offset << "(`s1)";
         assem = stream.str();
         // this->assemInstr_->GetInstrList()->Insert(
         //     ++il_it,
@@ -596,8 +593,8 @@ void RegAllocator::RewriteProgram() {
         noSpillTemp.insert(newTemp);
         src->Replace(spilledTemp, newTemp);
         std::stringstream stream;
-        stream << "movq (" << this->frame_->frame_size_ + this->frame_->offset
-               << ")(`s0), `d0";
+        stream << "movq " << this->frame_->frame_size_ + this->frame_->offset
+               << "(`s0), `d0";
         std::string assem = stream.str();
         // this->assemInstr_->GetInstrList()->Insert(
         //     il_it,
@@ -613,34 +610,46 @@ void RegAllocator::RewriteProgram() {
                            spilledTemp) != dstTempList.end()) {
         temp::Temp *newTemp = temp::TempFactory::NewTemp();
         noSpillTemp.insert(newTemp);
+        RLOG("replace here\n");
         dst->Replace(spilledTemp, newTemp);
         std::stringstream stream;
-        stream << "movq `s0, ("
-               << this->frame_->frame_size_ + this->frame_->offset << ")(`s1)";
+        stream << "movq `s0, "
+               << this->frame_->frame_size_ + this->frame_->offset << "(`s1)";
         std::string assem = stream.str();
-        // this->assemInstr_->GetInstrList()->Insert(
-        //     ++il_it,
-        //     new assem::OperInstr(
-        //         assem, nullptr,
-        //         new temp::TempList({newTemp, reg_manager->StackPointer()}),
-        //         nullptr));
-        // --il_it;
-
+        RTAN;
+        RLOG("[size = %d]\n", newInstrList.size());
         newInstrList.push_back(*il_it);
+        RLOG("[size = %d]\n", newInstrList.size());
+        RTAN;
         newInstrList.push_back(new assem::OperInstr(
             assem, nullptr,
             new temp::TempList({newTemp, reg_manager->StackPointer()}),
             nullptr));
+        RLOG("[size = %d]\n", newInstrList.size());
       } else {
         newInstrList.push_back(*il_it);
       }
     }
+
+    RLOG("one for finished [size = %d->%d]\n",
+         assemInstr_->GetInstrList()->GetList().size(), newInstrList.size());
+
+    if (!newInstrList.empty()) {
+      RLOG("befor [size = %d]\n",
+           assemInstr_->GetInstrList()->GetList().size());
+      instrList = newInstrList;
+      this->assemInstr_->GetInstrList()->UpdateList(newInstrList);
+      newInstrList.clear();
+
+      RLOG("after it [size = %d]\n",
+           assemInstr_->GetInstrList()->GetList().size());
+    }
   }
 
-  // inst_out = fopen("instr.log", "a+");
-  // fprintf(inst_out, "\n\n  after :\n");
-  // assemInstr_->GetInstrList()->Print(inst_out, reg_manager->temp_map_);
-  // fclose(inst_out);
+  inst_out = fopen("instr.log", "a+");
+  fprintf(inst_out, "\n\n  after :\n");
+  assemInstr_->GetInstrList()->Print(inst_out, my_color);
+  fclose(inst_out);
 
   spilledNodes.clear();
   coloredNodes.clear();
