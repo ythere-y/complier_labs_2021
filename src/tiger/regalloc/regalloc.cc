@@ -557,15 +557,10 @@ void RegAllocator::RewriteProgram() {
         src->Replace(spilledTemp, newTemp);
         dst->Replace(spilledTemp, newTemp);
         std::stringstream stream;
+
         stream << "movq " << this->frame_->frame_size_ + this->frame_->offset
                << "(`s0), `d0";
         std::string assem = stream.str();
-        // this->assemInstr_->GetInstrList()->Insert(
-        //     il_it,
-        //     new assem::OperInstr(
-        //         assem, new temp::TempList({newTemp}),
-        //         new temp::TempList(reg_manager->StackPointer()), nullptr));
-
         newInstrList.push_back(new assem::OperInstr(
             assem, new temp::TempList({newTemp}),
             new temp::TempList(reg_manager->StackPointer()), nullptr));
@@ -576,13 +571,7 @@ void RegAllocator::RewriteProgram() {
         stream << "movq `s0, "
                << this->frame_->frame_size_ + this->frame_->offset << "(`s1)";
         assem = stream.str();
-        // this->assemInstr_->GetInstrList()->Insert(
-        //     ++il_it,
-        //     new assem::OperInstr(
-        //         assem, nullptr,
-        //         new temp::TempList({newTemp, reg_manager->StackPointer()}),
-        //         nullptr));
-        // --il_it;
+
         newInstrList.push_back(new assem::OperInstr(
             assem, nullptr,
             new temp::TempList({newTemp, reg_manager->StackPointer()}),
@@ -593,18 +582,18 @@ void RegAllocator::RewriteProgram() {
         noSpillTemp.insert(newTemp);
         src->Replace(spilledTemp, newTemp);
         std::stringstream stream;
-        stream << "movq " << this->frame_->frame_size_ + this->frame_->offset
-               << "(`s0), `d0";
-        std::string assem = stream.str();
-        // this->assemInstr_->GetInstrList()->Insert(
-        //     il_it,
-        //     new assem::OperInstr(
-        //         assem, new temp::TempList({newTemp}),
-        //         new temp::TempList(reg_manager->StackPointer()), nullptr));
-
+        temp::Temp *dst_tmp = temp::TempFactory::NewTemp();
         newInstrList.push_back(new assem::OperInstr(
-            assem, new temp::TempList({newTemp}),
+            "movq %rsp,`d0", new temp::TempList(dst_tmp),
             new temp::TempList(reg_manager->StackPointer()), nullptr));
+        newInstrList.push_back(new assem::OperInstr(
+            "addq %rbx, `d0", new temp::TempList(dst_tmp),
+            new temp::TempList(reg_manager->GetRegister(1)), nullptr));
+        stream << "movq " << this->frame_->offset << "(`s0), `d0";
+        std::string assem = stream.str();
+        newInstrList.push_back(
+            new assem::OperInstr(assem, new temp::TempList({newTemp}),
+                                 new temp::TempList(dst_tmp), nullptr));
         newInstrList.push_back(*il_it);
       } else if (std::find(dstTempList.begin(), dstTempList.end(),
                            spilledTemp) != dstTempList.end()) {
@@ -613,8 +602,9 @@ void RegAllocator::RewriteProgram() {
         RLOG("replace here\n");
         dst->Replace(spilledTemp, newTemp);
         std::stringstream stream;
-        stream << "movq `s0, "
-               << this->frame_->frame_size_ + this->frame_->offset << "(`s1)";
+
+        stream << "movq `s0,-8(`s1) ";
+
         std::string assem = stream.str();
         RTAN;
         RLOG("[size = %d]\n", newInstrList.size());
@@ -625,6 +615,10 @@ void RegAllocator::RewriteProgram() {
             assem, nullptr,
             new temp::TempList({newTemp, reg_manager->StackPointer()}),
             nullptr));
+        newInstrList.push_back(
+            new assem::OperInstr("subq $8,%rsp", nullptr, nullptr, nullptr));
+        newInstrList.push_back(
+            new assem::OperInstr("addq $8,%rbx", nullptr, nullptr, nullptr));
         RLOG("[size = %d]\n", newInstrList.size());
       } else {
         newInstrList.push_back(*il_it);

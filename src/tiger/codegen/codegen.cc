@@ -47,11 +47,11 @@ void CodeGen::Codegen() { /* TODO: Put your lab5 code here */
   // NOTE: don't use %rbx in function body later!
 
   // todo
-  std::stringstream stream;
-  stream << "movq $" << _frame->frame_size_ << ", `d0";
-  instrList->Append(new assem::OperInstr(
-      stream.str(), new temp::TempList({reg_manager->GetRegister(1)}), nullptr,
-      nullptr));
+  // std::stringstream stream;
+  // stream << "movq $" << _frame->frame_size_ << ", `d0";
+  // instrList->Append(new assem::OperInstr(
+  //     stream.str(), new temp::TempList({reg_manager->GetRegister(1)}),
+  //     nullptr, nullptr));
 
   std::list<tree::Stm *> treeStmList = this->traces_->GetStmList()->GetList();
   for (auto stm_it = treeStmList.begin(); stm_it != treeStmList.end();
