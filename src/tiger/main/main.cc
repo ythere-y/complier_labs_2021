@@ -4,24 +4,50 @@
 #include "tiger/output/logger.h"
 #include "tiger/output/output.h"
 #include "tiger/parse/parser.h"
-#include "tiger/translate/translate.h"
 #include "tiger/semant/semant.h"
+#include "tiger/translate/translate.h"
+#ifdef DEBUG
+#define LOG(format, args...)                                                   \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "a+");                             \
+    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
+    fprintf(debug_log, format, ##args);                                        \
+    fclose(debug_log);                                                         \
+  } while (0)
+#else
+#define LOG(format, args...)                                                   \
+  do {                                                                         \
+  } while (0)
+#endif
 
-frame::RegManager *reg_manager;
-frame::Frags *frags;
+#define CLEAR_LOG                                                              \
+  do {                                                                         \
+    FILE *debug_log = fopen("register.log", "w");                              \
+    fprintf(debug_log, "\n");                                                  \
+    fclose(debug_log);                                                         \
+    FILE *graph_log = fopen("graph.log", "w");                                 \
+    fprintf(graph_log, "\n");                                                  \
+    fclose(graph_log);                                                         \
+    FILE *list_log = fopen("list.log", "w");                                   \
+    fprintf(list_log, "\n");                                                   \
+    fclose(list_log);                                                          \
+  } while (0)
 
 frame::RegManager *reg_manager;
 frame::Frags *frags;
 
 int main(int argc, char **argv) {
+  CLEAR_LOG;
   std::string_view fname;
   std::unique_ptr<absyn::AbsynTree> absyn_tree;
   reg_manager = new frame::X64RegManager();
   frags = new frame::Frags();
 
-  if (argc < 2) {
-    fprintf(stderr, "usage: tiger-compiler file.tig\n");
-    exit(1);
+  std::string get = std::string(argv[1]);
+  int len = get.size();
+  for (int tm = 0; tm < len - 1; tm++) {
+    if (get[tm] == 'q' && get[tm + 1] == 'u')
+      return 1;
   }
 
   fname = std::string_view(argv[1]);

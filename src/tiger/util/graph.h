@@ -28,6 +28,8 @@ public:
   static void Show(FILE *out, NodeList<T> *p,
                    std::function<void(T *)> show_info);
 
+  static void Show(FILE *out, NodeList<T> *p);
+
   int nodecount_;
 
   ~Graph();
@@ -215,9 +217,13 @@ template <typename T> void NodeList<T>::CatList(NodeList<T> *nl) {
 
 template <typename T> NodeList<T> *NodeList<T>::Union(NodeList<T> *nl) {
   NodeList<T> *res = new NodeList<T>();
-  res->CatList(this);
-  res->CatList(nl);
-  res->node_list_.unique();
+  for (auto node : node_list_) {
+    res->Append(node);
+  }
+  for (auto node : nl->GetList()) {
+    if (!res->Contain(node))
+      res->Append(node);
+  }
   return res;
 }
 
@@ -253,6 +259,21 @@ void Graph<T>::Show(FILE *out, NodeList<T> *p,
       fprintf(out, "%d ", q->Key());
     for (auto q : n->Pred()->node_list_)
       fprintf(out, "%d ", q->Key());
+    fprintf(out, "\n");
+  }
+}
+template <typename T> void Graph<T>::Show(FILE *out, NodeList<T> *p) {
+  for (Node<T> *n : p->node_list_) {
+    assert(n);
+    fprintf(out, " (%d):[num = %d]  succ -> [s = %d] ", n->Key(),
+            n->NodeInfo()->Int(), n->Succ()->node_list_.size());
+    for (auto q : n->Succ()->node_list_) {
+      fprintf(out, "%d ", q->Key());
+      q->NodeInfo();
+    }
+    // fprintf(out, " ..  red <- ");
+    // for (auto q : n->Pred()->node_list_)
+    //   fprintf(out, "%d ", q->Key());
     fprintf(out, "\n");
   }
 }

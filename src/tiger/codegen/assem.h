@@ -21,7 +21,8 @@ public:
   virtual ~Instr() = default;
 
   virtual void Print(FILE *out, temp::Map *m) const = 0;
-
+  [[nodiscard]] virtual temp::TempList *Def() const = 0;
+  [[nodiscard]] virtual temp::TempList *Use() const = 0;
 };
 
 class OperInstr : public Instr {
@@ -35,7 +36,8 @@ public:
       : assem_(std::move(assem)), dst_(dst), src_(src), jumps_(jumps) {}
 
   void Print(FILE *out, temp::Map *m) const override;
-
+  [[nodiscard]] temp::TempList *Def() const override;
+  [[nodiscard]] temp::TempList *Use() const override;
 };
 
 class LabelInstr : public Instr {
@@ -47,7 +49,8 @@ public:
       : assem_(std::move(assem)), label_(label) {}
 
   void Print(FILE *out, temp::Map *m) const override;
-
+  [[nodiscard]] temp::TempList *Def() const override;
+  [[nodiscard]] temp::TempList *Use() const override;
 };
 
 class MoveInstr : public Instr {
@@ -59,7 +62,8 @@ public:
       : assem_(std::move(assem)), dst_(dst), src_(src) {}
 
   void Print(FILE *out, temp::Map *m) const override;
-
+  [[nodiscard]] temp::TempList *Def() const override;
+  [[nodiscard]] temp::TempList *Use() const override;
 };
 
 class InstrList {
@@ -75,6 +79,8 @@ public:
   [[nodiscard]] const std::list<Instr *> &GetList() const {
     return instr_list_;
   }
+
+  void UpdateList(std::list<Instr *> newList) {instr_list_=newList;}
 
 private:
   std::list<Instr *> instr_list_;

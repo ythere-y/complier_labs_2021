@@ -127,10 +127,13 @@ X64RegManager::X64RegManager() {
     temp_map_->Enter(regs_[i], name);
   }
 
-  _registers = new temp::TempList({regs_[0], regs_[1], regs_[2], regs_[3],
-                                   regs_[5], regs_[6], regs_[7], regs_[8],
-                                   regs_[9], regs_[10], regs_[11], regs_[12],
-                                   regs_[13], regs_[14], regs_[15]});
+  // %rbs was used to store the frame size, so will no be return as general
+  // register.
+  _registers = new temp::TempList(
+      {regs_[0],
+       // regs_[1],
+       regs_[2], regs_[3], regs_[4], regs_[5], regs_[6], regs_[8], regs_[9],
+       regs_[10], regs_[11], regs_[12], regs_[13], regs_[14], regs_[15]});
 
   _argRegs = new temp::TempList(
       {regs_[5], regs_[4], regs_[3], regs_[2], regs_[8], regs_[9]});
@@ -140,7 +143,8 @@ X64RegManager::X64RegManager() {
                           regs_[8], regs_[9], regs_[10], regs_[11]});
 
   _calleeSaves = new temp::TempList(
-      {regs_[1], regs_[6], regs_[12], regs_[13], regs_[14], regs_[15]});
+      {// regs_[1],
+       regs_[6], regs_[12], regs_[13], regs_[14], regs_[15]});
 
   _returnSink = new temp::TempList({regs_[1], regs_[6], regs_[12], regs_[13],
                                     regs_[14], regs_[15], regs_[0], regs_[7]});
@@ -166,8 +170,7 @@ tree::Stm *ProcEntryExit1(frame::Frame *frame, tree::Stm *stm) {
   return result;
 }
 
-//Δ why can this function indicate that these registers are "active"?
-void ProcEntryExit2(assem::InstrList *body) { 
+void ProcEntryExit2(assem::InstrList *body) {
   body->Append(
       new assem::OperInstr("", reg_manager->ReturnSink(), nullptr, nullptr));
 }
@@ -178,10 +181,12 @@ assem::Proc *ProcEntryExit3(frame::Frame *frame, assem::InstrList *body) {
   sprintf(instr, "%s:\n", frame->name_->Name().c_str());
   prolog = std::string(instr);
 
-  sprintf(instr, "\tsubq $%d, %%rsp\n", frame->frame_size_);
+  sprintf(instr, "\tsubq $%d, %%rsp\n\tmovq $%d,%%rbx\n", frame->frame_size_,
+          frame->frame_size_);
   prolog.append(std::string(instr));
 
-  sprintf(instr, "\taddq $%d, %%rsp\n", frame->frame_size_);
+  // sprintf(instr, "\tsubq $%d, %%rbx\n\taddq %%rbx, %%rsp\n", 8);
+  sprintf(instr, "\taddq %%rbx, %%rsp\n", 8);
   std::string epilog = std::string(instr);
 
   epilog.append(std::string("\tretq\n"));

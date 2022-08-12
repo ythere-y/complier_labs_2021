@@ -10,13 +10,6 @@
 #include "tiger/frame/frame.h"
 #include "tiger/frame/x64frame.h"
 #include "tiger/semant/types.h"
-#define LOG(format, args...)                                                   \
-  do {                                                                         \
-    FILE *debug_log = fopen("tiger.log", "a+");                                \
-    fprintf(debug_log, "%d,%s: ", __LINE__, __func__);                         \
-    fprintf(debug_log, format, ##args);                                        \
-    fclose(debug_log);                                                         \
-  } while (0)
 
 namespace tr {
 
@@ -55,12 +48,11 @@ public:
          std::unique_ptr<err::ErrorMsg> erromsg)
       : absyn_tree_(std::move(absyn_tree)), errormsg_(std::move(erromsg)),
         tenv_(std::make_unique<env::TEnv>()),
-        venv_(std::make_unique<env::VEnv>()) {
-    main_level_.reset(
-        new Level(frame::X64Frame::newFrame(
-                      temp::LabelFactory::NamedLabel("outerFrame"), nullptr),
-                  nullptr));
-  }
+        venv_(std::make_unique<env::VEnv>()) 
+        {
+          main_level_.reset(new Level(frame::X64Frame::newFrame(
+              temp::LabelFactory::NamedLabel("outerFrame"), nullptr), nullptr));
+        }
 
   /**
    * Translate IR tree

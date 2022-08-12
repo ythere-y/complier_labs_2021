@@ -67,6 +67,12 @@ public:
   void Append(Temp *t) { temp_list_.push_back(t); }
   [[nodiscard]] Temp *NthTemp(int i) const;
   [[nodiscard]] const std::list<Temp *> &GetList() const { return temp_list_; }
+  void Replace(Temp *oldTemp, Temp *newTemp) {
+    auto foundTemp = std::find(temp_list_.begin(), temp_list_.end(), oldTemp);
+    assert(foundTemp != temp_list_.end());
+    temp_list_.insert(foundTemp, newTemp);
+    temp_list_.remove(*foundTemp);
+  }
 
 private:
   std::list<Temp *> temp_list_;
