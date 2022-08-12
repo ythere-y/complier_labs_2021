@@ -29,3 +29,12 @@ _deps
 
 # idea
 .idea
+
+*.log
+
+# python cache
+*.pyc
+
+
+# my edit
+*.md
